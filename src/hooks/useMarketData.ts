@@ -11,6 +11,7 @@ import { migrateNeuralToIdb } from '../lib/neural/repository';
 import { recordPricePoints } from '../lib/priceHistory';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
+import { getEngineToggles } from '../lib/engines';
 import { observeCandidate } from '../lib/neural/observer';
 import { recordPrices, seedCloses, HEATMAP_SYMBOLS } from '../lib/priceHistory';
 import { maybeForexSnapshot } from '../lib/forexJournal';
@@ -170,6 +171,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
               news,
               equity: equityRef.current,
               riskPct: riskRef.current,
+              engines: getEngineToggles(),
             },
             history
           );

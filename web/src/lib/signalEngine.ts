@@ -3,6 +3,7 @@ import {
 } from '../types';
 import { getVerdict, checkNewsFilter, totalScore } from './scoring';
 import { appendKaizen } from './kaizen';
+import { ENGINE_NAMES, EngineId } from './engines';
 import { newsNearSymbol } from './news';
 import { RawFeatureInputs } from './neural/features';
 import { evalSessions } from './sessions';
@@ -117,15 +118,11 @@ export interface EngineInput {
   news: NewsEvent[];
   equity: number;
   riskPct: number;
+  /** Engine nào đang bật (tab SIG). Engine bị tắt → tín hiệu loại đó bị chặn. */
+  engines?: Partial<Record<EngineId, boolean>>;
 }
 
-const ENGINE_NAMES: Record<string, string> = {
-  SMC: 'SMC ICT Alpha',
-  TREND: 'Trend Ribbon Pro',
-  MEAN_REV: 'Mean Reversion Sweep',
-};
-
-function pickEngine(rsiV: number, rocV: number): 'SMC' | 'TREND' | 'MEAN_REV' {
+export function pickEngine(rsiV: number, rocV: number): EngineId {
   if (rsiV <= 32 || rsiV >= 68) return 'MEAN_REV'; // cực đoan → bắt đảo chiều
   if (Math.abs(rocV) > 0.4) return 'TREND';        // động lượng rõ → theo trend
   return 'SMC';                                    // mặc định: cấu trúc giá
@@ -199,6 +196,11 @@ export function evaluateSignal(
 
   const direction = prelimDirection;
   const engine = pickEngine(rsiV, rocV);
+
+  // Engine bị user tắt ở tab SIG → chặn tín hiệu (minh bạch, không âm thầm)
+  if (input.engines?.[engine] === false) {
+    return { signal: null, snapshot, rawFeatures };
+  }
 
   const score = totalScore(factors as any);
   const verdict = getVerdict(score);

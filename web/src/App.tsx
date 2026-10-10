@@ -418,7 +418,16 @@ export const App: React.FC = () => {
                 />
               )}
               {activeTab === 'CTX' && <CtxTab marketContext={marketContext} asset={selectedAsset} />}
-              {activeTab === 'SIG' && <SigTab newsEvents={news} selectedSymbol={selectedAsset.symbol} />}
+              {activeTab === 'SIG' && (
+                <SigTab
+                  newsEvents={news}
+                  selectedSymbol={selectedAsset.symbol}
+                  asset={assets.find((a) => a.symbol === selectedAsset.symbol)}
+                  snapshot={snapshots[selectedAsset.symbol]}
+                  signal={signals[selectedAsset.symbol]}
+                  account={liveAccount}
+                />
+              )}
               {activeTab === 'RADAR' && (
                 <RadarTab
                   assets={assets}
