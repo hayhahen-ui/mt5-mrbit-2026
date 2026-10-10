@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Radio, Zap, BookOpen, Brain, LayoutDashboard } from 'lucide-react';
 import { Asset, Signal, JournalEntry } from '../types';
 import { getNeuralMode } from '../lib/neural/observer';
 import { countNeuralRecords } from '../lib/neural/repository';
+import { DataSourcesPanel } from './DataSourcesPanel';
 
 interface DashboardStripProps {
   assets: Asset[];
@@ -29,14 +30,16 @@ export const DashboardStrip: React.FC<DashboardStripProps> = ({ assets, signals,
 
   const neuralMode = getNeuralMode();
   const neuralCount = countNeuralRecords();
+  /** Bấm thẻ FEED để mở panel kiểm chứng nguồn dữ liệu */
+  const [showSources, setShowSources] = useState(false);
 
   const cards = [
     {
       icon: <Radio size={16} className="text-emerald-400" />,
       label: 'FEED DỮ LIỆU',
       value: `${feedOk}/${assets.length}`,
-      sub: 'mã có giá thật',
-      onClick: onGoRadar,
+      sub: 'mã có giá thật · bấm để xem nguồn',
+      onClick: () => setShowSources((v) => !v),
     },
     {
       icon: <Zap size={16} className="text-amber-400" />,
@@ -89,6 +92,11 @@ export const DashboardStrip: React.FC<DashboardStripProps> = ({ assets, signals,
             </button>
           ))}
         </div>
+        {showSources && (
+          <div className="mt-3">
+            <DataSourcesPanel onGoRadar={onGoRadar} />
+          </div>
+        )}
       </div>
     </div>
   );

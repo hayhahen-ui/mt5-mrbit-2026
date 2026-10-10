@@ -422,6 +422,7 @@ export const App: React.FC = () => {
               {activeTab === 'RADAR' && (
                 <RadarTab
                   assets={assets}
+                  signals={signals}
                   selectedAsset={selectedAsset}
                   onSelectAsset={(a) => {
                     setSelectedAsset(a);

@@ -22,6 +22,37 @@ export function getNewsSourceName(): string {
   return newsSourceName;
 }
 
+/** Sức khỏe nguồn lịch tin — phục vụ panel kiểm chứng */
+export interface NewsSourceHealth {
+  id: string;
+  name: string;
+  endpoint: string;
+  serves: string;
+  interval: string;
+  lastOk: boolean | null;
+  lastAt: number;
+  latencyMs: number | null;
+  error: string | null;
+  note: string;
+}
+
+const newsHealth: NewsSourceHealth = {
+  id: 'forexfactory',
+  name: 'ForexFactory',
+  endpoint: 'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
+  serves: 'Lịch kinh tế tuần (tin HIGH/MED/LOW)',
+  interval: '15 phút',
+  lastOk: null,
+  lastAt: 0,
+  latencyMs: null,
+  error: null,
+  note: 'Trình duyệt có thể chặn CORS → tự dùng bộ dự phòng, cửa sổ tin vẫn tính bằng giờ thật',
+};
+
+export function getNewsHealth(): NewsSourceHealth {
+  return { ...newsHealth };
+}
+
 function parseFF(raw: any[]): NewsEvent[] {
   const out: NewsEvent[] = [];
   raw.forEach((e, i) => {
@@ -68,6 +99,7 @@ function refreshFallbackWindow(): NewsEvent[] {
 export async function fetchEconomicCalendar(): Promise<NewsEvent[]> {
   // Dùng cache nếu đã lấy thật thành công (lịch tuần ít thay đổi)
   if (cachedReal) return cachedReal.map((n) => ({ ...n }));
+  const t0 = Date.now();
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 12000);
@@ -78,11 +110,28 @@ export async function fetchEconomicCalendar(): Promise<NewsEvent[]> {
     if (!Array.isArray(raw) || raw.length === 0) throw new Error('empty');
     cachedReal = parseFF(raw);
     newsSourceName = 'ForexFactory (live)';
+    newsHealth.lastOk = true;
+    newsHealth.lastAt = Date.now();
+    newsHealth.latencyMs = Date.now() - t0;
+    newsHealth.error = null;
     return cachedReal;
-  } catch {
+  } catch (e) {
     newsSourceName = 'Dự phòng (giờ thật)';
+    newsHealth.lastOk = false;
+    newsHealth.lastAt = Date.now();
+    newsHealth.latencyMs = null;
+    newsHealth.error = e instanceof Error ? e.message : 'fetch failed (có thể bị CORS)';
     return refreshFallbackWindow();
   }
+}
+
+/** Kiểm tra lại nguồn lịch tin theo yêu cầu người dùng (nút "Kiểm tra") */
+export async function testNewsSource(): Promise<boolean> {
+  const keep = cachedReal;
+  cachedReal = null; // bỏ cache để thử fetch thật
+  await fetchEconomicCalendar();
+  if (newsHealth.lastOk !== true && keep) cachedReal = keep; // giữ cache cũ nếu thử thất bại
+  return newsHealth.lastOk === true;
 }
 
 /** Tin HIGH gần một mã trong ±minutes phút — dùng cho market snapshot */

@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Asset, DataSource } from '../../types';
-import { Radar, ArrowUpRight, ArrowDownRight, ArrowUpDown } from 'lucide-react';
+import { Asset, DataSource, Signal } from '../../types';
+import { Radar, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronDown, ScanSearch } from 'lucide-react';
+import { totalScore, maxScore } from '../../lib/scoring';
 
 interface RadarTabProps {
   assets: Asset[];
+  signals: Record<string, Signal>;
   selectedAsset: Asset;
   onSelectAsset: (asset: Asset) => void;
 }
@@ -31,9 +33,11 @@ function timeAgo(ts?: number): string {
   return `${Math.floor(m / 60)}h trước`;
 }
 
-export const RadarTab: React.FC<RadarTabProps> = ({ assets, selectedAsset, onSelectAsset }) => {
+export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, selectedAsset, onSelectAsset }) => {
   const [sortKey, setSortKey] = useState<SortKey>('quality');
   const [catFilter, setCatFilter] = useState<CatFilter>('ALL');
+  /** Mã đang mở chi tiết quét */
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const filtered = catFilter === 'ALL' ? [...assets] : assets.filter((a) => a.category === catFilter);
@@ -56,7 +60,7 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, selectedAsset, onSel
             <span className="font-bold text-sm text-slate-100">RADAR QUÉT ĐA CẶP THỜI GIAN THỰC (MULTI-ASSET SCANNER)</span>
           </div>
           <span className="text-xs text-slate-400 font-mono">
-            {signalCount}/{assets.length} mã có tín hiệu · Bấm một thẻ để chuyển Cockpit
+            {signalCount}/{assets.length} mã có tín hiệu · Bấm thẻ để chuyển Cockpit · nút Chi tiết để xem từng tiêu chí quét
           </span>
         </div>
 
@@ -98,6 +102,11 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, selectedAsset, onSel
             const hasSignal = asset.signalDir !== 'FLAT';
             const src = SOURCE_META[asset.dataSource || 'OFFLINE'];
             const warming = (asset.warmup || '0/20') !== '20/20';
+            const sig = signals[asset.symbol];
+            const isOpen = expanded === asset.symbol;
+            const factors = sig?.scoreBreakdown || [];
+            const sc = sig ? totalScore(sig.scoreBreakdown) : 0;
+            const scMax = sig ? maxScore(sig.scoreBreakdown) : 0;
 
             return (
               <div
@@ -151,16 +160,93 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, selectedAsset, onSel
 
                 <div className="flex items-center justify-between text-[11px] pt-2 border-t border-[#1e2b48] font-mono">
                   <span className="text-slate-400">Spread: {asset.spread} p</span>
-                  {hasSignal ? (
-                    <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
-                      asset.signalDir === 'BUY' ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
-                    }`}>
-                      {asset.signalDir} ({asset.quality})
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">Đang quét...</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {hasSignal ? (
+                      <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                        asset.signalDir === 'BUY' ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
+                      }`}>
+                        {asset.signalDir} ({asset.quality})
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">Đang quét...</span>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpanded(isOpen ? null : asset.symbol);
+                      }}
+                      title="Xem chi tiết từng tiêu chí quét"
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                        isOpen
+                          ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
+                          : 'bg-[#17223b] border-[#243356] text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <ScanSearch size={11} />
+                      Chi tiết
+                      <ChevronDown size={11} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
                 </div>
+
+                {/* Chi tiết từng tiêu chí quét */}
+                {isOpen && (
+                  <div
+                    className="mt-2 pt-2 border-t border-[#1e2b48] space-y-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-slate-200">CHI TIẾT QUÉT #{asset.symbol}</span>
+                      {sig && (
+                        <span className="font-mono text-slate-400">
+                          Điểm <strong className="text-sky-300">{sc}</strong>/{scMax}
+                          {sig.verdict && <span className="text-slate-500"> · {sig.verdict}</span>}
+                        </span>
+                      )}
+                    </div>
+                    {sig?.engineName && (
+                      <div className="text-[10px] text-slate-500">
+                        Engine: <span className="text-slate-300">{sig.engineName}</span>
+                        {sig.rationale && <span className="text-slate-500"> — {sig.rationale}</span>}
+                      </div>
+                    )}
+                    {factors.length === 0 ? (
+                      <div className="text-[11px] text-slate-500">
+                        {warming
+                          ? `Engine đang thu thập mẫu giá (${asset.warmup}) — đủ 20/20 mới chấm điểm.`
+                          : 'Chưa có dữ liệu chấm điểm cho mã này.'}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {factors.map((f) => (
+                          <div key={f.id} className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-300 flex items-center gap-1.5">
+                                <span className={f.passed ? 'text-emerald-400' : 'text-slate-500'}>
+                                  {f.passed ? '✓' : '○'}
+                                </span>
+                                {f.label}
+                              </span>
+                              <span className="font-mono text-slate-400">
+                                <strong className={f.passed ? 'text-slate-200' : 'text-slate-500'}>{f.points}</strong>/{f.maxPoints}
+                              </span>
+                            </div>
+                            <div className="w-full bg-[#17223b] h-1 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${f.passed ? 'bg-sky-400' : 'bg-slate-600'}`}
+                                style={{ width: `${f.maxPoints > 0 ? (f.points / f.maxPoints) * 100 : 0}%` }}
+                              />
+                            </div>
+                            {f.detail && <div className="text-[10px] text-slate-500 pl-4">{f.detail}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-500">
+                      Nguồn: <span className="font-mono">{asset.sourceName || '—'}</span> · Cập nhật {timeAgo(asset.updatedAt)}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
