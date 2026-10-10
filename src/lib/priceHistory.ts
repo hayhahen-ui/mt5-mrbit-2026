@@ -58,13 +58,17 @@ export function mtfChange(symbol: string, minutes: number): number | null {
   const now = Date.now();
   const target = now - minutes * 60_000;
   const tol = minutes * 60_000 * 0.5;
-  // Điểm gần nhất tại/trước target
+  // Điểm GẦN mốc target nhất (không phải điểm mới nhất trong cửa sổ)
   let ref: Pt | null = null;
-  for (let i = arr.length - 1; i >= 0; i--) {
-    if (arr[i].t <= target + tol) { ref = arr[i]; break; }
+  let bestDiff = Infinity;
+  for (const pt of arr) {
+    const d = Math.abs(pt.t - target);
+    if (d < bestDiff) { bestDiff = d; ref = pt; }
   }
-  if (!ref || Math.abs(ref.t - target) > tol) return null;
+  if (!ref || bestDiff > tol) return null;
   const cur = arr[arr.length - 1];
+  // Điểm hiện tại phải mới (trong 1/2 khung) — tránh so với giá cũ rích
+  if (now - cur.t > tol) return null;
   if (ref.p <= 0) return null;
   return Number((((cur.p - ref.p) / ref.p) * 100).toFixed(2));
 }
