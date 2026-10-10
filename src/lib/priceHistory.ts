@@ -60,6 +60,11 @@ export function pointCounts(): Record<string, number> {
   return out;
 }
 
+/** Dung lượng kho giá (byte, ước tính) */
+export function priceHistorySize(): number {
+  try { return (localStorage.getItem(KEY) || '').length * 2; } catch { return 0; }
+}
+
 /** Lấy n giá đóng gần nhất của 1 mã (để seed engine warmup sau F5). */
 export function seedCloses(symbol: string, n = 120): number[] {
   const arr = read()[symbol] || [];

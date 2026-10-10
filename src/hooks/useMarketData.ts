@@ -62,8 +62,10 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
           }
         }
         recordPrices(realPrices);
-        const newsHigh = (news || []).filter((e) => e.impact === 'HIGH').length;
-        maybeForexSnapshot(realPrices, newsHigh);
+        const highNews = (news || []).filter((e) => e.impact === 'HIGH');
+        const newsHigh = highNews.length;
+        const newsTop = highNews.slice(0, 12).map((e) => `${e.currency} ${e.title}`);
+        maybeForexSnapshot(realPrices, newsHigh, newsTop);
       } catch { /* không để journal làm hỏng luồng giá */ }
 
       setState((prev) => {
