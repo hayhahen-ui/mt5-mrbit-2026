@@ -4,10 +4,13 @@
  * Giữ: cài đặt chế độ neural (shadow on/off).
  */
 
+import { POSITIONS_KEY } from './positions';
+
 export const RESET_KEYS = [
   'nexuspilot-journal-v1',
   'nexuspilot-kaizen-v1',
   'nexuspilot-neural-v1',
+  POSITIONS_KEY,
 ] as const;
 
 export function resetAllLocalData(): void {

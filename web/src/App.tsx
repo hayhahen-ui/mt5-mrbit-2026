@@ -23,10 +23,11 @@ import { DashboardStrip } from './components/DashboardStrip';
 import { findLatestKaizenFor, linkKaizenOutcome, clearKaizen, loadKaizen } from './lib/kaizen';
 import { resetAllLocalData, markResetTime, getResetMark } from './lib/reset';
 import { loadStartBalance, saveStartBalance, realizedPnlUsd } from './lib/account';
+import { loadPositions, savePositions, DEFAULT_AUTO_CLOSE, POSITIONS_KEY } from './lib/positions';
 
 /** Mặc định tự động đóng cho lệnh mới — lưu localStorage */
 const AUTO_DEFAULT_KEY = 'nexuspilot-autoclose-default-v1';
-const DEFAULT_AUTO: AutoCloseConfig = { mode: 'AUTO', tp: true, sl: true, timeStopMin: null };
+const DEFAULT_AUTO: AutoCloseConfig = DEFAULT_AUTO_CLOSE;
 
 function loadDefaultAuto(): AutoCloseConfig {
   try {
@@ -51,11 +52,15 @@ export const App: React.FC = () => {
   const [startBalance, setStartBalance] = useState<number>(() => loadStartBalance());
   /** Sổ tín hiệu — persist localStorage, nguồn số liệu thật cho tab LOG */
   const [journal, setJournal] = useState<JournalEntry[]>(() => loadJournal());
-  const [positions, setPositions] = useState<Position[]>([]);
+  const [positions, setPositions] = useState<Position[]>(() => loadPositions());
   /** Mirror ref để engine tự đóng đọc vị thế mới nhất trong effect giá */
   const positionsRef = useRef<Position[]>([]);
   useEffect(() => {
     positionsRef.current = positions;
+  }, [positions]);
+  /** Persist vị thế đang mở — F5 không mất lệnh */
+  useEffect(() => {
+    savePositions(positions);
   }, [positions]);
   /** Chế độ đóng mặc định cho lệnh mở mới (TAY / AUTO) */
   const [defaultAuto, setDefaultAuto] = useState<AutoCloseConfig>(() => loadDefaultAuto());
