@@ -39,7 +39,8 @@ export function recordPrices(prices: Record<string, number>): void {
     const arr = h[sym] || [];
     const last = arr[arr.length - 1];
     if (last && now - last.t < MIN_GAP_MS) continue; // chưa đủ 60s
-    if (last && last.p === price) continue;
+    // KHÔNG skip khi giá đứng yên: 0.00% cũng là dữ liệu hợp lệ cho heatmap.
+    // (Nguồn daily như ER-API nếu skip giá không đổi thì forex mãi chỉ có 1 điểm.)
     arr.push({ t: now, p: price });
     // Cắt cũ hơn 30h + trần số điểm
     const cutoff = now - KEEP_MS;
@@ -49,6 +50,14 @@ export function recordPrices(prices: Record<string, number>): void {
     changed = true;
   }
   if (changed) write(h);
+}
+
+/** Số điểm giá đã ghi cho từng mã — để kiểm chứng việc thu thập có chạy. */
+export function pointCounts(): Record<string, number> {
+  const h = read();
+  const out: Record<string, number> = {};
+  for (const s of HEATMAP_SYMBOLS) out[s] = h[s]?.length ?? 0;
+  return out;
 }
 
 /** % thay đổi so với N phút trước — null khi thiếu dữ liệu (tolerance 50% khung). */

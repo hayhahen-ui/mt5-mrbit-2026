@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Database, Camera, ChevronDown } from 'lucide-react';
 import {
-  heatmap, HEATMAP_SYMBOLS, HEATMAP_TFS, HEATMAP_TF_LABELS, latestPrices,
+  heatmap, HEATMAP_SYMBOLS, HEATMAP_TFS, HEATMAP_TF_LABELS, latestPrices, pointCounts,
 } from '../lib/priceHistory';
 import {
   getForexJournal, lastSnapAt, takeForexSnapshot, heatBias, ForexSnap,
@@ -34,6 +34,7 @@ function fmtTime(t: number): string {
  */
 export const ForexJournalPanel: React.FC = () => {
   const [hm, setHm] = useState(() => heatmap());
+  const [counts, setCounts] = useState<Record<string, number>>(() => pointCounts());
   const [journal, setJournal] = useState<ForexSnap[]>(() => getForexJournal());
   const [showHist, setShowHist] = useState(false);
   const [, force] = useState(0);
@@ -41,6 +42,7 @@ export const ForexJournalPanel: React.FC = () => {
   useEffect(() => {
     const id = setInterval(() => {
       setHm(heatmap());
+      setCounts(pointCounts());
       setJournal(getForexJournal());
     }, 60000);
     return () => clearInterval(id);
@@ -78,6 +80,9 @@ export const ForexJournalPanel: React.FC = () => {
       <div className="text-[11px] text-slate-400">
         Heatmap % thay đổi giá đa khung, tự tính từ giá thật app thu thập (thay cho MyFxBook heat-map).
         Snapshot 15 phút/lần: giá + heatmap + tâm lý MyFxBook + số tin HIGH — lưu append-only, không tự xóa.
+        <span className="font-mono text-slate-500">
+          {' '}· điểm giá đã ghi: {HEATMAP_SYMBOLS.map((x) => `${x.replace('USD','')}:${counts[x] ?? 0}`).join(' ')}
+        </span>
       </div>
 
       {/* Heatmap */}
