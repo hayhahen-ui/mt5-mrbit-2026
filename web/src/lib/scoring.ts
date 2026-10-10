@@ -1,16 +1,5 @@
 import { NewsEvent, ScoreFactor, SignalVerdict } from '../types';
-
-/** Bản đồ tiền tệ ảnh hưởng tới từng mã — dùng cho bộ lọc tin tức */
-const SYMBOL_CURRENCIES: Record<string, string[]> = {
-  XAUUSD: ['USD'],
-  EURUSD: ['EUR', 'USD'],
-  GBPUSD: ['GBP', 'USD'],
-  USDJPY: ['USD', 'JPY'],
-  AUDUSD: ['AUD', 'USD'],
-  BTCUSD: ['USD'],
-  ETHUSD: ['USD'],
-  US30: ['USD'],
-};
+import { currenciesForSymbol } from './symbolNews';
 
 export interface NewsFilterResult {
   blocked: boolean;
@@ -23,7 +12,7 @@ export interface NewsFilterResult {
  * HIGH impact của đồng tiền liên quan đang trong cửa sổ tin.
  */
 export function checkNewsFilter(symbol: string, newsEvents: NewsEvent[]): NewsFilterResult {
-  const currencies = SYMBOL_CURRENCIES[symbol] || [];
+  const currencies = currenciesForSymbol(symbol);
   const hits = newsEvents.filter(
     (n) => n.impact === 'HIGH' && n.inWindow && currencies.includes(n.currency)
   );

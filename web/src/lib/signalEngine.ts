@@ -6,6 +6,7 @@ import { appendKaizen } from './kaizen';
 import { newsNearSymbol } from './news';
 import { RawFeatureInputs } from './neural/features';
 import { evalSessions } from './sessions';
+import { currenciesForSymbol } from './symbolNews';
 
 /**
  * Signal Engine chạy trên DỮ LIỆU THẬT:
@@ -18,14 +19,7 @@ import { evalSessions } from './sessions';
 export const WARMUP_MIN = 20;
 const MAX_HISTORY = 120;
 
-export const SYMBOL_CURRENCIES = (symbol: string): string[] => {
-  const map: Record<string, string[]> = {
-    XAUUSD: ['USD'], EURUSD: ['EUR', 'USD'], GBPUSD: ['GBP', 'USD'],
-    USDJPY: ['USD', 'JPY'], AUDUSD: ['AUD', 'USD'],
-    BTCUSD: ['USD'], ETHUSD: ['USD'], US30: ['USD'],
-  };
-  return map[symbol] || [];
-};
+
 
 /* ---------- chỉ báo ---------- */
 
@@ -150,7 +144,7 @@ export function evaluateSignal(
   const rsiV = rsi(hist, 14);
   const ema20 = ema(hist, 20);
   const newsFilter = checkNewsFilter(asset.symbol, news);
-  const nearNews = newsNearSymbol(asset.symbol, news, SYMBOL_CURRENCIES, 60);
+  const nearNews = newsNearSymbol(asset.symbol, news, currenciesForSymbol, 60);
   const historyReady = history.isReady(asset.symbol);
   const spreadOk = asset.spread <= (asset.category === 'Crypto' ? 25 : 2.5);
 

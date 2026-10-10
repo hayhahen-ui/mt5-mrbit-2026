@@ -5,7 +5,7 @@ import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
 import { observeCandidate } from '../lib/neural/observer';
-import { recordPrices } from '../lib/priceHistory';
+import { recordPrices, seedCloses, HEATMAP_SYMBOLS } from '../lib/priceHistory';
 import { maybeForexSnapshot } from '../lib/forexJournal';
 import { totalScore } from '../lib/scoring';
 
@@ -175,6 +175,13 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
         fetchEconomicCalendar(),
       ]);
       if (cancelled) return;
+      // Seed warmup engine từ kho giá localStorage (không mất 20 mẫu sau mỗi F5)
+      try {
+        for (const sym of HEATMAP_SYMBOLS) {
+          const closes = seedCloses(sym, 120);
+          if (closes.length >= 5) historyRef.current.seed(sym, closes);
+        }
+      } catch { /* bỏ qua */ }
       if (btcHist.length) historyRef.current.seed('BTCUSD', btcHist);
       if (ethHist.length) historyRef.current.seed('ETHUSD', ethHist);
       setState((prev) => ({ ...prev, news, newsSource: getNewsSourceName() }));

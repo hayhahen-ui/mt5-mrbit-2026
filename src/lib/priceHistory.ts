@@ -60,6 +60,12 @@ export function pointCounts(): Record<string, number> {
   return out;
 }
 
+/** Lấy n giá đóng gần nhất của 1 mã (để seed engine warmup sau F5). */
+export function seedCloses(symbol: string, n = 120): number[] {
+  const arr = read()[symbol] || [];
+  return arr.slice(-n).map((p) => p.p);
+}
+
 /** % thay đổi so với N phút trước — null khi thiếu dữ liệu (tolerance 50% khung). */
 export function mtfChange(symbol: string, minutes: number): number | null {
   const arr = read()[symbol];
