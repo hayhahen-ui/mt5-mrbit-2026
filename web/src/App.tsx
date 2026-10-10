@@ -432,7 +432,7 @@ export const App: React.FC = () => {
                 />
               )}
               {activeTab === 'NEWS' && <NewsTab newsEvents={news} newsSource={newsSource} />}
-              {activeTab === 'CHART' && <ChartPanel assets={assets} journal={journal} initialSymbol={selectedAsset.symbol} />}
+              {activeTab === 'CHART' && <ChartPanel assets={assets} journal={journal} initialSymbol={selectedAsset.symbol} news={news} />}
               {activeTab === 'JOURNAL' && (
                 <JournalTab
                   positions={positions}
