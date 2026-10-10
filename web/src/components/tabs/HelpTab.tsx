@@ -9,6 +9,7 @@ export const HelpTab: React.FC = () => {
     { key: 'D', desc: 'Mở tab RADAR (Bảng quét đa tài sản & Chuyển cặp tiền)' },
     { key: 'N', desc: 'Mở tab NEWS (Lịch kinh tế & Cửa sổ tin tức đỏ)' },
     { key: 'L', desc: 'Mở tab LOG (Thống kê hiệu suất & Xuất báo cáo)' },
+    { key: 'C', desc: 'Mở tab CHART (Biểu đồ nến & marker lệnh Entry/SL/TP)' },
     { key: 'H', desc: 'Mở tab HELP (Trợ giúp nhanh)' },
     { key: 'K', desc: 'Đóng / Mở thanh Dock công cụ bên trái' },
     { key: 'M', desc: 'Thu gọn (Minimize) hoặc Mở rộng Cockpit' },

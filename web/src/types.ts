@@ -1,4 +1,4 @@
-export type TabType = 'FLIGHT' | 'CTX' | 'SIG' | 'RADAR' | 'NEWS' | 'LOG' | 'HELP';
+export type TabType = 'FLIGHT' | 'CTX' | 'SIG' | 'RADAR' | 'NEWS' | 'LOG' | 'CHART' | 'HELP';
 
 export type SignalDirection = 'BUY' | 'SELL' | 'FLAT';
 export type QualityGrade = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'Q5';

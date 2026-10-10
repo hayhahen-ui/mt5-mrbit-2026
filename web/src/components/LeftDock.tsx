@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { AccountState, MarketContextState, Asset } from '../types';
-import { ShieldCheck, ShieldAlert, Clock, Calculator, Send, AlertTriangle, X } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Clock, Calculator, Send, AlertTriangle, X, Wallet } from 'lucide-react';
 import { evalSessions } from '../lib/sessions';
+import { CAPITAL_PRESETS, fmtUsd } from '../lib/account';
 
 interface LeftDockProps {
   isOpen: boolean;
   onClose: () => void;
   account: AccountState;
+  startBalance: number;
+  onStartBalanceChange: (v: number) => void;
   marketContext: MarketContextState;
   selectedAsset: Asset;
   onCloseAllPositions: () => void;
@@ -18,6 +21,8 @@ export const LeftDock: React.FC<LeftDockProps> = ({
   isOpen,
   onClose,
   account,
+  startBalance,
+  onStartBalanceChange,
   marketContext,
   selectedAsset,
   onCloseAllPositions,
@@ -25,6 +30,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
   onUpdateRiskPct
 }) => {
   const [slPoints, setSlPoints] = useState<number>(85);
+  const [customCapital, setCustomCapital] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -67,6 +73,57 @@ export const LeftDock: React.FC<LeftDockProps> = ({
           <div className="bg-[#0b0f19] p-2 rounded border border-[#1e2b48]">
             <div className="text-[10px] text-slate-400">Equity</div>
             <div className="font-mono font-bold text-emerald-400">${account.equity.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+          </div>
+        </div>
+
+        {/* Vốn ảo — chọn số vốn ban đầu */}
+        <div className="bg-[#0b0f19] p-2.5 rounded border border-[#1e2b48] space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-semibold text-slate-300">
+              <Wallet size={13} className="text-amber-400" />
+              VỐN ẢO (PAPER)
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">đang: {fmtUsd(startBalance)}</span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {CAPITAL_PRESETS.map((p) => (
+              <button
+                key={p}
+                onClick={() => onStartBalanceChange(p)}
+                className={`py-1.5 rounded-lg text-[11px] font-mono font-bold border transition-all ${
+                  startBalance === p
+                    ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                    : 'bg-[#17223b] border-[#243356] text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {p >= 1000 ? `$${p / 1000}K` : `$${p}`}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              type="number"
+              min={1}
+              placeholder="Số vốn khác ($)"
+              value={customCapital}
+              onChange={(e) => setCustomCapital(e.target.value)}
+              className="flex-1 min-w-0 bg-[#17223b] border border-[#243356] rounded-lg px-2 py-1.5 text-[11px] font-mono text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500/60"
+            />
+            <button
+              onClick={() => {
+                const v = Number(customCapital);
+                if (v > 0) {
+                  onStartBalanceChange(v);
+                  setCustomCapital('');
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[11px] font-bold hover:bg-amber-500/30"
+            >
+              ĐẶT
+            </button>
+          </div>
+          <div className="text-[10px] text-slate-500">
+            Balance = vốn ảo + P&L đã thực hiện từ sổ · Equity = Balance + P&L thả nổi
           </div>
         </div>
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Download, Trash2, BookOpen, FlaskConical, RotateCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Trash2, BookOpen, FlaskConical, RotateCcw, BarChart3 } from 'lucide-react';
 import { JournalEntry } from '../../types';
 import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
 import { analyzeKaizen } from '../../lib/kaizen';
@@ -12,9 +12,42 @@ interface LogTabProps {
   resetMark: number | null;
 }
 
+type RangeKey = '7D' | '30D' | 'ALL';
+
 export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClearKaizen, onResetAll, resetMark }) => {
+  const [range, setRange] = useState<RangeKey>('ALL');
   const stats = calcJournalStats(journal);
   const curve = equityCurve(journal);
+
+  // REPORT theo khoảng thời gian (kiểu EA Autopilot: 7D / 30D / ALL)
+  const cutoff = range === 'ALL' ? 0 : Date.now() - (range === '7D' ? 7 : 30) * 86400000;
+  const fj = journal.filter((j) => new Date(j.closeTime).getTime() >= cutoff);
+  const fs = calcJournalStats(fj);
+
+  const byQ = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'].map((q) => {
+    const es = fj.filter((j) => j.quality === q);
+    const wins = es.filter((j) => j.outcome === 'TP').length;
+    return {
+      q,
+      n: es.length,
+      win: es.length ? Number(((wins / es.length) * 100).toFixed(0)) : 0,
+      r: Number(es.reduce((a, e) => a + e.rMultiple, 0).toFixed(2)),
+    };
+  });
+  const maxQ = Math.max(1, ...byQ.map((b) => b.n));
+
+  const bySym = [...new Set(fj.map((j) => j.symbol))]
+    .map((s) => {
+      const es = fj.filter((j) => j.symbol === s);
+      const wins = es.filter((j) => j.outcome === 'TP').length;
+      return {
+        s,
+        n: es.length,
+        win: es.length ? Number(((wins / es.length) * 100).toFixed(0)) : 0,
+        r: Number(es.reduce((a, e) => a + e.rMultiple, 0).toFixed(2)),
+      };
+    })
+    .sort((a, b) => b.n - a.n);
   const resetMarkTxt = resetMark
     ? new Date(resetMark).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
     : null;
@@ -62,38 +95,111 @@ ${rows}
 
   return (
     <div className="space-y-4">
-      {/* 4 thẻ thống kê THẬT từ sổ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
-        <div className="glass-panel p-4 space-y-1">
-          <div className="text-[11px] text-slate-400">TỔNG LỆNH ĐÃ ĐÓNG</div>
-          <div className="text-2xl font-bold text-sky-400">{stats.total}</div>
-          <div className="text-[10px] text-slate-400 font-sans">
-            {stats.wins} Thắng / {stats.losses} Thua / {stats.breakEvens} BE
+      {/* REPORT — bộ lọc + 4 thẻ kiểu EA Autopilot */}
+      <div className="glass-panel p-5 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+            <BarChart3 size={16} className="text-sky-400" />
+            REPORT — HIỆU SUẤT GIAO DỊCH
+          </div>
+          <div className="flex gap-1.5">
+            {(['7D', '30D', 'ALL'] as RangeKey[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRange(r)}
+                className={`px-3 py-1 rounded-lg text-[11px] font-mono font-bold border transition-all ${
+                  range === r
+                    ? 'bg-sky-500/20 border-sky-500/60 text-sky-300'
+                    : 'bg-[#0b0f19] border-[#1e2b48] text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="glass-panel p-4 space-y-1">
-          <div className="text-[11px] text-slate-400">TỈ LỆ THẮNG (WIN RATE)</div>
-          <div className="text-2xl font-bold text-emerald-400">{stats.winRate}%</div>
-          <div className="text-[10px] text-slate-400 font-sans">Tính trên lệnh đã đóng sổ</div>
-        </div>
-
-        <div className="glass-panel p-4 space-y-1">
-          <div className="text-[11px] text-slate-400">TỔNG R TÍCH LŨY</div>
-          <div className={`text-2xl font-bold ${stats.totalR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {stats.totalR >= 0 ? '+' : ''}{stats.totalR}R
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
+          <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
+            <div className="text-[11px] text-slate-400">SIGNALS</div>
+            <div className="text-2xl font-bold text-slate-100">{fs.total}</div>
+            <div className="text-[10px] text-slate-500 font-sans">lệnh đã đóng sổ</div>
           </div>
-          <div className="text-[10px] text-slate-400 font-sans">Avg {stats.avgR >= 0 ? '+' : ''}{stats.avgR}R / lệnh</div>
+          <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
+            <div className="text-[11px] text-slate-400">WIN</div>
+            <div className="text-2xl font-bold text-rose-400">{fs.winRate}%</div>
+            <div className="text-[10px] text-slate-500 font-sans">{fs.wins} thắng / {fs.losses} thua / {fs.breakEvens} BE</div>
+          </div>
+          <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
+            <div className="text-[11px] text-slate-400">PIPS</div>
+            <div className={`text-2xl font-bold ${fs.totalPips >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {fs.totalPips >= 0 ? '+' : ''}{fs.totalPips}
+            </div>
+            <div className="text-[10px] text-slate-500 font-sans">tổng pips tích lũy</div>
+          </div>
+          <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
+            <div className="text-[11px] text-slate-400">AVG R</div>
+            <div className={`text-2xl font-bold ${fs.avgR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {fs.avgR >= 0 ? '+' : ''}{fs.avgR}
+            </div>
+            <div className="text-[10px] text-slate-500 font-sans">Tổng {fs.totalR >= 0 ? '+' : ''}{fs.totalR}R · PF {fs.profitFactor}</div>
+          </div>
         </div>
 
-        <div className="glass-panel p-4 space-y-1">
-          <div className="text-[11px] text-slate-400">PROFIT FACTOR (PF)</div>
-          <div className="text-2xl font-bold text-sky-400">{stats.profitFactor}</div>
-          <div className="text-[10px] text-slate-400 font-sans">Tổng R thắng / |tổng R thua|</div>
+        {/* BY Q — hiệu suất theo hạng tín hiệu */}
+        <div className="space-y-2">
+          <div className="text-[11px] font-bold text-purple-400 font-mono">BY Q — THEO HẠNG TÍN HIỆU</div>
+          <div className="grid grid-cols-5 gap-2">
+            {byQ.map((b) => (
+              <div key={b.q} className="bg-[#0b0f19] rounded-xl border border-[#1e2b48] p-2.5 text-center space-y-1">
+                <div className="text-[11px] font-mono font-bold text-slate-300">{b.q}</div>
+                <div className="h-1.5 bg-[#17223b] rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${b.win >= 50 ? 'bg-emerald-400' : b.win >= 30 ? 'bg-amber-400' : 'bg-rose-500'}`}
+                    style={{ width: `${(b.n / maxQ) * 100}%` }}
+                  />
+                </div>
+                <div className="text-[10px] font-mono text-slate-400">{b.n} lệnh · {b.win}%</div>
+                <div className={`text-[11px] font-mono font-bold ${b.r >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {b.r >= 0 ? '+' : ''}{b.r}R
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* RADAR — hiệu suất theo mã */}
+        <div className="space-y-2">
+          <div className="text-[11px] font-bold text-amber-400 font-mono">RADAR — THEO MÃ ({range})</div>
+          {bySym.length === 0 ? (
+            <div className="text-xs text-slate-500 bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48] text-center">
+              Chưa có lệnh trong khoảng này.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {bySym.map((b) => (
+                <div key={b.s} className="flex items-center gap-3 text-xs font-mono">
+                  <span className="w-20 font-bold text-slate-200">{b.s}</span>
+                  <div className="flex-1 h-2 bg-[#17223b] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${b.win >= 50 ? 'bg-emerald-400' : b.win >= 30 ? 'bg-amber-400' : 'bg-rose-500'}`}
+                      style={{ width: `${b.win}%` }}
+                    />
+                  </div>
+                  <span className="w-28 text-right text-slate-400 text-[11px]">
+                    {b.n} · {b.win}%
+                  </span>
+                  <span className={`w-20 text-right font-bold ${b.r >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {b.r >= 0 ? '+' : ''}{b.r}R
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Đường cong tăng trưởng R */}
+      {/* Đường cong tăng trưởng R (toàn thời gian) */}
       <div className="glass-panel p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="text-sm font-bold text-slate-200">ĐƯỜNG CONG TĂNG TRƯỞNG (R TÍCH LŨY)</div>

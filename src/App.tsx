@@ -17,25 +17,44 @@ import { loadJournal, saveJournal, clearJournal, entryFromPosition, OUTCOME_META
 import { checkNewsFilter, totalScore } from './lib/scoring';
 import { useMarketData } from './hooks/useMarketData';
 import { SessionClocks } from './components/SessionClocks';
+import { ChartPanel } from './components/ChartPanel';
 import { DashboardStrip } from './components/DashboardStrip';
 import { findLatestKaizenFor, linkKaizenOutcome, clearKaizen, loadKaizen } from './lib/kaizen';
 import { resetAllLocalData, markResetTime, getResetMark } from './lib/reset';
+import { loadStartBalance, saveStartBalance, realizedPnlUsd } from './lib/account';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('FLIGHT');
   const [account, setAccount] = useState<AccountState>(INITIAL_ACCOUNT);
-  // Dữ liệu thị trường THẬT (hook tự poll + engine đánh giá tín hiệu)
-  const { assets, signals, snapshots, news, newsSource, lastUpdated } = useMarketData(account.equity, account.riskPct);
-  const [selectedAsset, setSelectedAsset] = useState<Asset>(assets[0]);
+  /** Vốn ảo do người dùng chọn — Balance/Equity tính thật từ sổ + lệnh đang mở */
+  const [startBalance, setStartBalance] = useState<number>(() => loadStartBalance());
+  /** Sổ tín hiệu — persist localStorage, nguồn số liệu thật cho tab LOG */
+  const [journal, setJournal] = useState<JournalEntry[]>(() => loadJournal());
   const [positions, setPositions] = useState<Position[]>([]);
+  /** Balance/Equity THẬT của tài khoản vốn ảo */
+  const realizedPnl = realizedPnlUsd(journal);
+  const floatingPnl = positions.reduce((a, p) => a + (p.pnl || 0), 0);
+  const liveBalance = Number((startBalance + realizedPnl).toFixed(2));
+  const liveEquity = Number((liveBalance + floatingPnl).toFixed(2));
+  // Dữ liệu thị trường THẬT (hook tự poll + engine đánh giá tín hiệu)
+  const { assets, signals, snapshots, news, newsSource, lastUpdated } = useMarketData(liveEquity, account.riskPct);
+  const [selectedAsset, setSelectedAsset] = useState<Asset>(assets[0]);
   const [marketContext, setMarketContext] = useState<MarketContextState>(INITIAL_MARKET_CONTEXT);
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  /** Sổ tín hiệu — persist localStorage, nguồn số liệu thật cho tab LOG */
-  const [journal, setJournal] = useState<JournalEntry[]>(() => loadJournal());
   const [resetMark, setResetMark] = useState<number | null>(() => getResetMark());
+  const liveAccount: AccountState = { ...account, balance: liveBalance, equity: liveEquity };
+
+  const handleStartBalanceChange = (v: number) => {
+    if (!(v > 0) || v === startBalance) return;
+    if (window.confirm(`Đổi vốn ảo thành $${v.toLocaleString('en-US')}?\nBalance sẽ tính lại = vốn mới + P&L đã thực hiện (${realizedPnl >= 0 ? '+' : ''}$${realizedPnl}).`)) {
+      setStartBalance(v);
+      saveStartBalance(v);
+      showToast(`💰 Vốn ảo: $${v.toLocaleString('en-US')}`);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -60,6 +79,7 @@ export const App: React.FC = () => {
         case 'S': setActiveTab('SIG'); break;
         case 'D': setActiveTab('RADAR'); break;
         case 'N': setActiveTab('NEWS'); break;
+        case 'C': setActiveTab('CHART'); break;
         case 'L': setActiveTab('LOG'); break;
         case 'H': setActiveTab('HELP'); break;
         case 'K': setIsDockOpen((prev) => !prev); break;
@@ -277,7 +297,9 @@ export const App: React.FC = () => {
         <LeftDock
           isOpen={isDockOpen}
           onClose={() => setIsDockOpen(false)}
-          account={account}
+          account={liveAccount}
+          startBalance={startBalance}
+          onStartBalanceChange={handleStartBalanceChange}
           marketContext={marketContext}
           selectedAsset={selectedAsset}
           onCloseAllPositions={handleCloseAllPositions}
@@ -318,6 +340,7 @@ export const App: React.FC = () => {
                 />
               )}
               {activeTab === 'NEWS' && <NewsTab newsEvents={news} newsSource={newsSource} />}
+              {activeTab === 'CHART' && <ChartPanel assets={assets} journal={journal} initialSymbol={selectedAsset.symbol} />}
               {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} onResetAll={handleResetAll} resetMark={resetMark} />}
               {activeTab === 'HELP' && <HelpTab />}
             </div>
