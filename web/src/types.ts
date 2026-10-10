@@ -1,4 +1,4 @@
-export type TabType = 'FLIGHT' | 'CTX' | 'SIG' | 'RADAR' | 'NEWS' | 'LOG' | 'CHART' | 'HELP';
+export type TabType = 'FLIGHT' | 'CTX' | 'SIG' | 'RADAR' | 'NEWS' | 'CHART' | 'JOURNAL' | 'LOG' | 'HELP';
 
 export type SignalDirection = 'BUY' | 'SELL' | 'FLAT';
 export type QualityGrade = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'Q5';
@@ -16,7 +16,24 @@ export interface ScoreFactor {
 }
 
 /** Bản ghi sổ tín hiệu — kết quả thật của từng lệnh đã đóng */
-export type JournalOutcome = 'TP' | 'SL' | 'BE' | 'MANUAL';
+export type JournalOutcome = 'TP' | 'SL' | 'BE' | 'MANUAL' | 'TIME';
+
+/** Cấu hình tự động đóng lệnh cho một vị thế */
+export interface AutoCloseConfig {
+  mode: 'MANUAL' | 'AUTO';
+  tp: boolean; // tự chốt khi chạm TP
+  sl: boolean; // tự cắt khi chạm SL
+  timeStopMin: number | null; // time-stop: null = không dùng
+}
+
+export const TIME_STOP_OPTIONS: { label: string; minutes: number }[] = [
+  { label: '1m', minutes: 1 },
+  { label: '3m', minutes: 3 },
+  { label: '5m', minutes: 5 },
+  { label: '15m', minutes: 15 },
+  { label: '30m', minutes: 30 },
+  { label: '1D', minutes: 1440 },
+];
 
 export interface JournalEntry {
   id: string;
@@ -38,6 +55,10 @@ export interface JournalEntry {
   rMultiple: number;  // số R đạt được (âm khi thua)
   pips: number;
   note?: string;
+  /** Cách đóng lệnh: tay (người bấm) hay auto (bot tự đóng) */
+  closeMethod?: 'tay' | 'auto';
+  /** Ghi chú cách đóng: 'auto-TP' | 'auto-SL' | 'time-stop 15m' ... */
+  closeNote?: string;
   /** Bối cảnh thị trường + tin tức lúc vào lệnh — phục vụ phân tích Kaizen */
   marketSnapshot?: MarketSnapshot;
   /** Liên kết tới bản ghi đánh giá tín hiệu trong nhật ký Kaizen */
@@ -219,6 +240,10 @@ export interface Position {
   /** Liên kết Kaizen + ảnh chụp thị trường lúc mở lệnh */
   kaizenId?: string;
   marketSnapshot?: MarketSnapshot;
+  /** Thời điểm mở (ms epoch) — phục vụ time-stop */
+  openedAt: number;
+  /** Cấu hình tự động đóng lệnh */
+  autoClose: AutoCloseConfig;
 }
 
 export interface NewsEvent {

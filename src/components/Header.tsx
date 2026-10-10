@@ -36,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'RADAR', label: 'RADAR', key: 'D' },
     { id: 'NEWS', label: 'NEWS', key: 'N' },
     { id: 'CHART', label: 'CHART', key: 'C' },
+    { id: 'JOURNAL', label: 'SỔ LỆNH', key: 'J' },
     { id: 'LOG', label: 'LOG', key: 'L' },
     { id: 'HELP', label: 'HELP', key: 'H' }
   ];

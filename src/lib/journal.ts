@@ -56,7 +56,9 @@ export function entryFromPosition(
   pos: Position,
   outcome: JournalOutcome,
   exitPrice: number,
-  digits: number
+  digits: number,
+  closeMethod: 'tay' | 'auto' = 'tay',
+  closeNote?: string
 ): JournalEntry {
   const rMultiple = outcome === 'BE' ? 0 : calcRMultiple(pos.type, pos.entryPrice, pos.sl, exitPrice);
   const pipSize = 0.0001; // chuẩn hoá pips hiển thị
@@ -83,6 +85,8 @@ export function entryFromPosition(
     pips,
     marketSnapshot: pos.marketSnapshot,
     kaizenId: pos.kaizenId,
+    closeMethod,
+    closeNote,
   };
 }
 
@@ -117,4 +121,5 @@ export const OUTCOME_META: Record<JournalOutcome, { label: string; color: string
   SL: { label: 'Dính SL', color: 'text-rose-400' },
   BE: { label: 'Hòa vốn', color: 'text-sky-400' },
   MANUAL: { label: 'Đóng tay', color: 'text-slate-400' },
+  TIME: { label: 'Time-stop', color: 'text-amber-400' },
 };

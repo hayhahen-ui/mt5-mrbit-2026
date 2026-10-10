@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { TabType, Asset, Signal, Position, AccountState, MarketContextState, JournalEntry, JournalOutcome } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import { TabType, Asset, Signal, Position, AccountState, MarketContextState, JournalEntry, JournalOutcome, AutoCloseConfig } from './types';
 import {
   INITIAL_MARKET_CONTEXT,
   INITIAL_ACCOUNT
@@ -12,6 +12,7 @@ import { SigTab } from './components/tabs/SigTab';
 import { RadarTab } from './components/tabs/RadarTab';
 import { NewsTab } from './components/tabs/NewsTab';
 import { LogTab } from './components/tabs/LogTab';
+import { JournalTab } from './components/tabs/JournalTab';
 import { HelpTab } from './components/tabs/HelpTab';
 import { loadJournal, saveJournal, clearJournal, entryFromPosition, OUTCOME_META } from './lib/journal';
 import { checkNewsFilter, totalScore } from './lib/scoring';
@@ -23,6 +24,26 @@ import { findLatestKaizenFor, linkKaizenOutcome, clearKaizen, loadKaizen } from 
 import { resetAllLocalData, markResetTime, getResetMark } from './lib/reset';
 import { loadStartBalance, saveStartBalance, realizedPnlUsd } from './lib/account';
 
+/** Mặc định tự động đóng cho lệnh mới — lưu localStorage */
+const AUTO_DEFAULT_KEY = 'nexuspilot-autoclose-default-v1';
+const DEFAULT_AUTO: AutoCloseConfig = { mode: 'AUTO', tp: true, sl: true, timeStopMin: null };
+
+function loadDefaultAuto(): AutoCloseConfig {
+  try {
+    const raw = localStorage.getItem(AUTO_DEFAULT_KEY);
+    if (!raw) return { ...DEFAULT_AUTO };
+    const v = JSON.parse(raw);
+    return {
+      mode: v.mode === 'MANUAL' ? 'MANUAL' : 'AUTO',
+      tp: v.tp !== false,
+      sl: v.sl !== false,
+      timeStopMin: typeof v.timeStopMin === 'number' ? v.timeStopMin : null,
+    };
+  } catch {
+    return { ...DEFAULT_AUTO };
+  }
+}
+
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('FLIGHT');
   const [account, setAccount] = useState<AccountState>(INITIAL_ACCOUNT);
@@ -31,6 +52,21 @@ export const App: React.FC = () => {
   /** Sổ tín hiệu — persist localStorage, nguồn số liệu thật cho tab LOG */
   const [journal, setJournal] = useState<JournalEntry[]>(() => loadJournal());
   const [positions, setPositions] = useState<Position[]>([]);
+  /** Mirror ref để engine tự đóng đọc vị thế mới nhất trong effect giá */
+  const positionsRef = useRef<Position[]>([]);
+  useEffect(() => {
+    positionsRef.current = positions;
+  }, [positions]);
+  /** Chế độ đóng mặc định cho lệnh mở mới (TAY / AUTO) */
+  const [defaultAuto, setDefaultAuto] = useState<AutoCloseConfig>(() => loadDefaultAuto());
+  const handleDefaultAutoChange = (cfg: AutoCloseConfig) => {
+    setDefaultAuto(cfg);
+    try {
+      localStorage.setItem(AUTO_DEFAULT_KEY, JSON.stringify(cfg));
+    } catch {
+      /* bỏ qua */
+    }
+  };
   /** Balance/Equity THẬT của tài khoản vốn ảo */
   const realizedPnl = realizedPnlUsd(journal);
   const floatingPnl = positions.reduce((a, p) => a + (p.pnl || 0), 0);
@@ -80,6 +116,7 @@ export const App: React.FC = () => {
         case 'D': setActiveTab('RADAR'); break;
         case 'N': setActiveTab('NEWS'); break;
         case 'C': setActiveTab('CHART'); break;
+        case 'J': setActiveTab('JOURNAL'); break;
         case 'L': setActiveTab('LOG'); break;
         case 'H': setActiveTab('HELP'); break;
         case 'K': setIsDockOpen((prev) => !prev); break;
@@ -169,7 +206,9 @@ export const App: React.FC = () => {
       score: sigScore,
       quality: sig.quality,
       kaizenId: kz?.id,
-      marketSnapshot: snap
+      marketSnapshot: snap,
+      openedAt: Date.now(),
+      autoClose: { ...defaultAuto },
     });
 
     const newPositions: Position[] = [
@@ -189,10 +228,16 @@ export const App: React.FC = () => {
 
   /**
    * Đóng lệnh kèm đánh dấu kết quả → tự ghi vào sổ tín hiệu (Trade.2026-style).
-   * Giá thoát: TP → giá TP của tầng; SL → giá SL; BE → giá vào; MANUAL → giá hiện tại.
+   * Giá thoát: TP → giá TP của tầng; SL → giá SL; BE → giá vào; MANUAL/TIME → giá hiện tại.
+   * closeMethod: 'tay' (người bấm) | 'auto' (bot tự đóng).
    */
-  const handleCloseWithOutcome = (id: string, outcome: JournalOutcome) => {
-    const pos = positions.find((p) => p.id === id);
+  const handleCloseWithOutcome = (
+    id: string,
+    outcome: JournalOutcome,
+    closeMethod: 'tay' | 'auto' = 'tay',
+    closeNote?: string
+  ) => {
+    const pos = positionsRef.current.find((p) => p.id === id);
     if (!pos) return;
     const asset = assets.find((a) => a.symbol === pos.symbol);
     const digits = asset ? asset.digits : 2;
@@ -201,14 +246,50 @@ export const App: React.FC = () => {
       : outcome === 'SL' ? pos.sl
       : outcome === 'BE' ? pos.entryPrice
       : pos.currentPrice;
-    const entry = entryFromPosition(pos, outcome, exitPrice, digits);
+    const entry = entryFromPosition(pos, outcome, exitPrice, digits, closeMethod, closeNote);
     setJournal((prev) => [...prev, entry]);
     // Liên kết kết quả vào nhật ký Kaizen để phân tích yếu tố
     if (pos.kaizenId) linkKaizenOutcome(pos.kaizenId, outcome, entry.rMultiple);
     setPositions((prev) => prev.filter((p) => p.id !== id));
     const rTxt = `${entry.rMultiple >= 0 ? '+' : ''}${entry.rMultiple}R`;
-    showToast(`📝 Đã ghi sổ: #${pos.symbol} ${pos.tier} ${OUTCOME_META[outcome].label} (${rTxt})`);
+    const who = closeMethod === 'auto' ? '🤖 Bot tự đóng' : '📝 Đã ghi sổ';
+    showToast(`${who}: #${pos.symbol} ${pos.tier} ${OUTCOME_META[outcome].label}${closeNote ? ` (${closeNote})` : ''} (${rTxt})`);
   };
+
+  /** Cập nhật cấu hình tự đóng của một vị thế */
+  const handleUpdateAuto = (id: string, patch: Partial<AutoCloseConfig>) => {
+    setPositions((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, autoClose: { ...(p.autoClose || defaultAuto), ...patch } }
+          : p
+      )
+    );
+  };
+
+  // Engine BOT tự đóng lệnh: chạm TP/SL hoặc quá time-stop (chạy mỗi khi giá tick)
+  useEffect(() => {
+    const nowTs = Date.now();
+    for (const p of positionsRef.current) {
+      const ac = p.autoClose;
+      if (!ac || ac.mode !== 'AUTO') continue;
+      const cur = assets.find((a) => a.symbol === p.symbol);
+      if (!cur || cur.price <= 0) continue;
+      const px = cur.price;
+      p.currentPrice = px; // đồng bộ giá thoát cho bản ghi sổ
+      const hitTp = p.type === 'BUY' ? px >= p.tp : px <= p.tp;
+      const hitSl = p.type === 'BUY' ? px <= p.sl : px >= p.sl;
+      if (ac.tp && hitTp) {
+        handleCloseWithOutcome(p.id, 'TP', 'auto', 'auto-TP');
+      } else if (ac.sl && hitSl) {
+        handleCloseWithOutcome(p.id, 'SL', 'auto', 'auto-SL');
+      } else if (ac.timeStopMin && nowTs - (p.openedAt || nowTs) >= ac.timeStopMin * 60000) {
+        const lbl = ac.timeStopMin >= 60 ? `${ac.timeStopMin / 60}h` : `${ac.timeStopMin}m`;
+        handleCloseWithOutcome(p.id, 'TIME', 'auto', `time-stop ${lbl}`);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets]);
 
   const handleClearJournal = () => {
     if (window.confirm('Xóa toàn bộ sổ tín hiệu trên máy này? Hành động không thể hoàn tác.')) {
@@ -341,6 +422,18 @@ export const App: React.FC = () => {
               )}
               {activeTab === 'NEWS' && <NewsTab newsEvents={news} newsSource={newsSource} />}
               {activeTab === 'CHART' && <ChartPanel assets={assets} journal={journal} initialSymbol={selectedAsset.symbol} />}
+              {activeTab === 'JOURNAL' && (
+                <JournalTab
+                  positions={positions}
+                  journal={journal}
+                  defaultAuto={defaultAuto}
+                  onDefaultAutoChange={handleDefaultAutoChange}
+                  onUpdateAuto={handleUpdateAuto}
+                  onCloseWithOutcome={handleCloseWithOutcome}
+                  onMoveToBE={handleMoveToBE}
+                  onCloseAllPositions={handleCloseAllPositions}
+                />
+              )}
               {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} onResetAll={handleResetAll} resetMark={resetMark} />}
               {activeTab === 'HELP' && <HelpTab />}
             </div>
