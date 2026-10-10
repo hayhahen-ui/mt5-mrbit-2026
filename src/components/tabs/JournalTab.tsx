@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { OUTCOME_META } from '../../lib/journal';
 import { fmtLocalTime } from '../../lib/time';
+import { entryPnlUsd, fmtUsd } from '../../lib/account';
 
 interface JournalTabProps {
   positions: Position[];
@@ -336,6 +337,7 @@ export const JournalTab: React.FC<JournalTabProps> = ({
                   <th>Kết quả</th>
                   <th>Cách đóng</th>
                   <th className="text-right">R</th>
+                  <th className="text-right">Lãi/Lỗ ($)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1e2b48] font-mono">
@@ -360,6 +362,10 @@ export const JournalTab: React.FC<JournalTabProps> = ({
                     <td className={`text-right font-bold ${j.rMultiple >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {j.rMultiple >= 0 ? '+' : ''}{j.rMultiple}R
                     </td>
+                    {(() => { const usd = entryPnlUsd(j); return (
+                    <td className={`text-right font-bold ${usd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {usd >= 0 ? '+' : '-'}{fmtUsd(Math.abs(usd))}
+                    </td>); })()}
                   </tr>
                 ))}
               </tbody>
