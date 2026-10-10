@@ -12,12 +12,10 @@ const WINDOW_MIN = 30; // ±30 phút quanh giờ tin = cửa sổ chặn tín hi
 
 /**
  * faireconomy.media không gửi header CORS → fetch trực tiếp từ trình duyệt bị chặn
- * (dù mở tab mới vẫn xem được). Đi vòng qua proxy CORS công khai để lấy lịch thật.
+ * (dù mở tab mới vẫn xem được). Lấy qua proxy nội bộ /api/ff-calendar (serverless
+ * function của chính app, chạy phía server nên không bị CORS).
  */
-const FF_PROXIES: Array<(u: string) => string> = [
-  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-];
+const FF_PROXY_URL = '/api/ff-calendar';
 
 async function fetchJsonWithTimeout(url: string, ms: number): Promise<any> {
   const ctrl = new AbortController();
@@ -121,15 +119,15 @@ export async function fetchEconomicCalendar(): Promise<NewsEvent[]> {
   // Dùng cache nếu đã lấy thật thành công (lịch tuần ít thay đổi)
   if (cachedReal) return cachedReal.map((n) => ({ ...n }));
   const t0 = Date.now();
-  // Thử lần lượt: trực tiếp → proxy CORS 1 → proxy CORS 2
+  // Thử lần lượt: trực tiếp → proxy nội bộ /api/ff-calendar (cùng origin, không CORS)
   const candidates: Array<{ url: string; label: string }> = [
     { url: FF_URL, label: 'ForexFactory (live)' },
-    ...FF_PROXIES.map((p, i) => ({ url: p(FF_URL), label: `ForexFactory (qua proxy CORS ${i + 1})` })),
+    { url: FF_PROXY_URL, label: 'ForexFactory (qua proxy nội bộ)' },
   ];
   let lastErr: string | null = null;
   for (const c of candidates) {
     try {
-      const raw = await fetchJsonWithTimeout(c.url, 12000);
+      const raw = await fetchJsonWithTimeout(c.url, 15000);
       if (!Array.isArray(raw) || raw.length === 0) throw new Error('empty');
       cachedReal = parseFF(raw);
       newsSourceName = c.label;
@@ -139,7 +137,7 @@ export async function fetchEconomicCalendar(): Promise<NewsEvent[]> {
       newsHealth.error = null;
       newsHealth.note = c.url === FF_URL
         ? 'Lấy trực tiếp từ ForexFactory'
-        : 'Faireconomy.media chặn CORS từ trình duyệt → đi vòng qua proxy CORS công khai để lấy lịch thật';
+        : 'Faireconomy.media chặn CORS từ trình duyệt → lấy qua proxy nội bộ /api/ff-calendar của app';
       return cachedReal;
     } catch (e) {
       lastErr = e instanceof Error ? e.message : 'fetch failed';
@@ -151,7 +149,7 @@ export async function fetchEconomicCalendar(): Promise<NewsEvent[]> {
   newsHealth.lastAt = Date.now();
   newsHealth.latencyMs = null;
   newsHealth.error = lastErr;
-  newsHealth.note = 'Không lấy được lịch thật (kể cả qua proxy) → tự dùng bộ dự phòng, cửa sổ tin vẫn tính bằng giờ thật';
+  newsHealth.note = 'Không lấy được lịch thật (kể cả qua proxy nội bộ) → tự dùng bộ dự phòng, cửa sổ tin vẫn tính bằng giờ thật';
   return refreshFallbackWindow();
 }
 
