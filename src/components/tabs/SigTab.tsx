@@ -99,8 +99,8 @@ export const SigTab: React.FC<SigTabProps> = ({
     <div className="space-y-4">
       {/* 1. DÒNG CHẨN ĐOÁN (tính live, không chữ tĩnh) */}
       <div className={`glass-panel p-5 border-l-4 space-y-3 ${allClear ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
-        <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
-          <AlertCircle size={15} />
+        <div className={`flex items-center gap-2 text-xs font-bold ${allClear ? 'text-emerald-400' : 'text-amber-400'}`}>
+          {allClear ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
           <span>DÒNG CHẨN ĐOÁN LÝ DO "BỊ CHẶN" (TRANSPARENT DIAGNOSTICS)</span>
         </div>
         <div className="bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48] text-xs font-mono">
