@@ -61,6 +61,13 @@ function readCache(): Cache | null {
   } catch { return null; }
 }
 
+/** Đọc cache outlook đang có (không gọi mạng) — dùng cho nhật ký forex. */
+export function getCachedOutlook(): SentimentRow[] {
+  const c = readCache();
+  if (!c || Date.now() - c.at > CACHE_MS) return [];
+  return c.symbols;
+}
+
 /** Lấy outlook (dùng cache nếu còn tươi). force=true để bỏ qua cache. */
 export async function getOutlook(force = false): Promise<{ symbols: SentimentRow[]; cached: boolean; error?: string }> {
   const cred = getMfCred();

@@ -6,6 +6,7 @@ import { usdPerPipPerLot, pipSizeOf, fmtUsd } from '../../lib/account';
 import { NeuralPanel } from '../NeuralPanel';
 import { AiAsk } from '../AiAsk';
 import { getOutlook, findSentiment, sentimentBias } from '../../lib/sentiment';
+import { heatmapSummary } from '../../lib/priceHistory';
 
 interface FlightTabProps {
   signal: Signal | undefined;
@@ -394,6 +395,7 @@ export const FlightTab: React.FC<FlightTabProps> = ({
             `- Phiên đang mở: ${snapshot?.session || '—'}, biến động: ${snapshot?.atrProxy ?? '—'}%`,
             `- Tin HIGH gần (±60 phút): ${news}`,
             `- Nguồn giá: ${asset.sourceName || '—'}`,
+            `- Heatmap đa khung (tự tính từ giá thật):\n${heatmapSummary()}`,
             `- Tâm lý đám đông MyFxBook: ${await (async () => {
               try {
                 const r = await getOutlook(false);

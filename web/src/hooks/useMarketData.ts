@@ -5,6 +5,8 @@ import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
 import { observeCandidate } from '../lib/neural/observer';
+import { recordPrices } from '../lib/priceHistory';
+import { maybeForexSnapshot } from '../lib/forexJournal';
 import { totalScore } from '../lib/scoring';
 
 export interface MarketDataState {
@@ -50,6 +52,19 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
     (quotes: Record<string, { price: number; change24h: number; source: DataSource; sourceName: string }>, news: NewsEvent[]) => {
       const history = historyRef.current;
       const today = new Date().toISOString().slice(0, 10);
+
+      // Nhật ký dữ liệu forex: ghi lịch sử giá (heatmap) + snapshot 15 phút
+      try {
+        const realPrices: Record<string, number> = {};
+        for (const [sym, q] of Object.entries(quotes)) {
+          if (q && q.source !== 'OFFLINE' && Number.isFinite(q.price) && q.price > 0) {
+            realPrices[sym] = q.price;
+          }
+        }
+        recordPrices(realPrices);
+        const newsHigh = (news || []).filter((e) => e.impact === 'HIGH').length;
+        maybeForexSnapshot(realPrices, newsHigh);
+      } catch { /* không để journal làm hỏng luồng giá */ }
 
       setState((prev) => {
         const assets = prev.assets.map((a) => {
