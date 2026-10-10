@@ -10,6 +10,27 @@ import { INITIAL_NEWS } from '../data/mockData';
 const FF_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
 const WINDOW_MIN = 30; // ±30 phút quanh giờ tin = cửa sổ chặn tín hiệu
 
+/**
+ * faireconomy.media không gửi header CORS → fetch trực tiếp từ trình duyệt bị chặn
+ * (dù mở tab mới vẫn xem được). Đi vòng qua proxy CORS công khai để lấy lịch thật.
+ */
+const FF_PROXIES: Array<(u: string) => string> = [
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+];
+
+async function fetchJsonWithTimeout(url: string, ms: number): Promise<any> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 const COUNTRY_CCY: Record<string, string> = {
   USD: 'USD', EUR: 'EUR', GBP: 'GBP', JPY: 'JPY',
   AUD: 'AUD', CAD: 'CAD', CHF: 'CHF', NZD: 'NZD',
@@ -100,29 +121,38 @@ export async function fetchEconomicCalendar(): Promise<NewsEvent[]> {
   // Dùng cache nếu đã lấy thật thành công (lịch tuần ít thay đổi)
   if (cachedReal) return cachedReal.map((n) => ({ ...n }));
   const t0 = Date.now();
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 12000);
-    const res = await fetch(FF_URL, { signal: ctrl.signal });
-    clearTimeout(t);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const raw = await res.json();
-    if (!Array.isArray(raw) || raw.length === 0) throw new Error('empty');
-    cachedReal = parseFF(raw);
-    newsSourceName = 'ForexFactory (live)';
-    newsHealth.lastOk = true;
-    newsHealth.lastAt = Date.now();
-    newsHealth.latencyMs = Date.now() - t0;
-    newsHealth.error = null;
-    return cachedReal;
-  } catch (e) {
-    newsSourceName = 'Dự phòng (giờ thật)';
-    newsHealth.lastOk = false;
-    newsHealth.lastAt = Date.now();
-    newsHealth.latencyMs = null;
-    newsHealth.error = e instanceof Error ? e.message : 'fetch failed (có thể bị CORS)';
-    return refreshFallbackWindow();
+  // Thử lần lượt: trực tiếp → proxy CORS 1 → proxy CORS 2
+  const candidates: Array<{ url: string; label: string }> = [
+    { url: FF_URL, label: 'ForexFactory (live)' },
+    ...FF_PROXIES.map((p, i) => ({ url: p(FF_URL), label: `ForexFactory (qua proxy CORS ${i + 1})` })),
+  ];
+  let lastErr: string | null = null;
+  for (const c of candidates) {
+    try {
+      const raw = await fetchJsonWithTimeout(c.url, 12000);
+      if (!Array.isArray(raw) || raw.length === 0) throw new Error('empty');
+      cachedReal = parseFF(raw);
+      newsSourceName = c.label;
+      newsHealth.lastOk = true;
+      newsHealth.lastAt = Date.now();
+      newsHealth.latencyMs = Date.now() - t0;
+      newsHealth.error = null;
+      newsHealth.note = c.url === FF_URL
+        ? 'Lấy trực tiếp từ ForexFactory'
+        : 'Faireconomy.media chặn CORS từ trình duyệt → đi vòng qua proxy CORS công khai để lấy lịch thật';
+      return cachedReal;
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : 'fetch failed';
+    }
   }
+  // Tất cả đều thất bại → bộ dự phòng, cửa sổ tin vẫn tính bằng GIỜ THẬT
+  newsSourceName = 'Dự phòng (giờ thật)';
+  newsHealth.lastOk = false;
+  newsHealth.lastAt = Date.now();
+  newsHealth.latencyMs = null;
+  newsHealth.error = lastErr;
+  newsHealth.note = 'Không lấy được lịch thật (kể cả qua proxy) → tự dùng bộ dự phòng, cửa sổ tin vẫn tính bằng giờ thật';
+  return refreshFallbackWindow();
 }
 
 /** Kiểm tra lại nguồn lịch tin theo yêu cầu người dùng (nút "Kiểm tra") */
