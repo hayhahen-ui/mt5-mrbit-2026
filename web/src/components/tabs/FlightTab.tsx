@@ -1,6 +1,7 @@
 import React from 'react';
-import { Signal, Asset, Position } from '../../types';
-import { TrendingUp, TrendingDown, Target, Shield, Zap, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { Signal, Asset, Position, JournalEntry, JournalOutcome } from '../../types';
+import { TrendingUp, TrendingDown, Target, Shield, Zap, CheckCircle2, ChevronRight, X, AlertTriangle, BarChart3 } from 'lucide-react';
+import { totalScore, maxScore, getVerdict, VERDICT_META, NewsFilterResult } from '../../lib/scoring';
 
 interface FlightTabProps {
   signal: Signal | undefined;
@@ -9,6 +10,10 @@ interface FlightTabProps {
   onExecuteTrade: (sig: Signal, lot: number) => void;
   onClosePosition: (id: string) => void;
   onMoveToBE: (id: string) => void;
+  /** Đánh dấu kết quả khi đóng lệnh → ghi sổ tín hiệu */
+  onCloseWithOutcome: (id: string, outcome: JournalOutcome) => void;
+  newsFilter: NewsFilterResult;
+  recentJournal: JournalEntry[];
 }
 
 export const FlightTab: React.FC<FlightTabProps> = ({
@@ -17,7 +22,10 @@ export const FlightTab: React.FC<FlightTabProps> = ({
   positions,
   onExecuteTrade,
   onClosePosition,
-  onMoveToBE
+  onMoveToBE,
+  onCloseWithOutcome,
+  newsFilter,
+  recentJournal
 }) => {
   if (!signal) {
     return (
@@ -32,9 +40,24 @@ export const FlightTab: React.FC<FlightTabProps> = ({
   }
 
   const isBuy = signal.direction === 'BUY';
+  const score = totalScore(signal.scoreBreakdown);
+  const scoreMax = maxScore(signal.scoreBreakdown);
+  const verdict = signal.verdict || getVerdict(score);
+  const verdictMeta = VERDICT_META[verdict];
 
   return (
     <div className="space-y-4">
+      {/* 0. CẢNH BÁO BỘ LỌC TIN TỨC */}
+      {newsFilter.blocked && (
+        <div className="glass-panel p-4 border-l-4 border-l-rose-500 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
+          <div className="text-xs space-y-1">
+            <div className="font-bold text-rose-400">CẢNH BÁO TIN TỨC — CÂN NHẮC ĐỨNG NGOÀI</div>
+            <div className="text-slate-300">{newsFilter.reason}</div>
+            <div className="text-slate-400">Biến động mạnh khi tin ra có thể quét SL. Nên chờ qua cửa sổ tin mới vào lệnh.</div>
+          </div>
+        </div>
+      )}
       {/* 1. CANDLESTICK CHART WITH SMC OVERLAYS */}
       <div className="glass-panel p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -158,6 +181,49 @@ export const FlightTab: React.FC<FlightTabProps> = ({
           </div>
         </div>
 
+        {/* 2b. CHI TIẾT CHẤM ĐIỂM MINH BẠCH (Trade.2026-style) */}
+        <div className="bg-[#0b0f19] p-4 rounded-lg border border-[#1e2b48] space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+              <BarChart3 size={14} className="text-amber-400" />
+              CHI TIẾT CHẤM ĐIỂM TÍN HIỆU
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm font-bold text-slate-100">
+                {score}<span className="text-slate-400">/{scoreMax}</span>
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${verdictMeta.bg} ${verdictMeta.color} ${verdictMeta.border}`}>
+                {verdictMeta.label}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {(signal.scoreBreakdown || []).map((f) => (
+              <div key={f.id} className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-300 flex items-center gap-1.5">
+                    <span className={f.passed ? 'text-emerald-400' : 'text-slate-500'}>
+                      {f.passed ? '✓' : '○'}
+                    </span>
+                    {f.label}
+                  </span>
+                  <span className="font-mono text-slate-400">
+                    <strong className={f.passed ? 'text-slate-200' : 'text-slate-500'}>{f.points}</strong>/{f.maxPoints}
+                  </span>
+                </div>
+                <div className="w-full bg-[#17223b] h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${f.passed ? 'bg-sky-400' : 'bg-slate-600'}`}
+                    style={{ width: `${(f.points / f.maxPoints) * 100}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-slate-500 pl-4">{f.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Price Levels Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs font-mono">
           <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-[#1e2b48]">
@@ -255,20 +321,44 @@ export const FlightTab: React.FC<FlightTabProps> = ({
                     <td className={pos.pnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                       {pos.pnl >= 0 ? '+' : ''}${pos.pnl.toFixed(2)} ({pos.pips.toFixed(1)}p)
                     </td>
-                    <td className="text-right space-x-2">
-                      <button
-                        onClick={() => onMoveToBE(pos.id)}
-                        className="px-2 py-1 rounded bg-sky-950 text-sky-400 border border-sky-800 text-[10px] hover:bg-sky-900"
-                        title="Dời Stop Loss về hòa vốn"
-                      >
-                        DỜI BE
-                      </button>
-                      <button
-                        onClick={() => onClosePosition(pos.id)}
-                        className="px-2 py-1 rounded bg-rose-950 text-rose-400 border border-rose-800 text-[10px] hover:bg-rose-900"
-                      >
-                        ĐÓNG
-                      </button>
+                    <td className="text-right">
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <button
+                          onClick={() => onMoveToBE(pos.id)}
+                          className="px-2 py-1 rounded bg-sky-950 text-sky-400 border border-sky-800 text-[10px] hover:bg-sky-900"
+                          title="Dời Stop Loss về hòa vốn"
+                        >
+                          DỜI BE
+                        </button>
+                        <button
+                          onClick={() => onCloseWithOutcome(pos.id, 'TP')}
+                          className="px-2 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] hover:bg-emerald-900 font-bold"
+                          title="Đánh dấu chạm TP — ghi sổ tín hiệu"
+                        >
+                          ✓ TP
+                        </button>
+                        <button
+                          onClick={() => onCloseWithOutcome(pos.id, 'SL')}
+                          className="px-2 py-1 rounded bg-rose-950 text-rose-400 border border-rose-800 text-[10px] hover:bg-rose-900 font-bold"
+                          title="Đánh dấu dính SL — ghi sổ tín hiệu"
+                        >
+                          ✗ SL
+                        </button>
+                        <button
+                          onClick={() => onCloseWithOutcome(pos.id, 'BE')}
+                          className="px-2 py-1 rounded bg-sky-950 text-sky-300 border border-sky-800 text-[10px] hover:bg-sky-900"
+                          title="Đóng hòa vốn — ghi sổ tín hiệu"
+                        >
+                          = BE
+                        </button>
+                        <button
+                          onClick={() => onCloseWithOutcome(pos.id, 'MANUAL')}
+                          className="px-2 py-1 rounded bg-[#17223b] text-slate-400 border border-[#243356] text-[10px] hover:text-white"
+                          title="Đóng tay theo giá hiện tại — ghi sổ tín hiệu"
+                        >
+                          ĐÓNG TAY
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -278,40 +368,43 @@ export const FlightTab: React.FC<FlightTabProps> = ({
         </div>
       )}
 
-      {/* 4. TODAY'S STRIP */}
+      {/* 4. DẢI TÍN HIỆU GẦN ĐÂY — từ sổ tín hiệu thật */}
       <div className="glass-panel p-4 space-y-2.5">
-        <div className="text-xs text-slate-400">DẢI TÍN HIỆU GẦN ĐÂY (TODAY STRIP)</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-xs">
-          <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-emerald-900/60 flex items-center justify-between">
-            <div>
-              <div className="font-bold text-slate-200">#XAUUSD BUY @ 2640.20</div>
-              <div className="text-[10px] text-slate-400">SMC ICT Alpha · M15</div>
-            </div>
-            <span className="px-2 py-1 rounded bg-emerald-950 text-emerald-400 font-bold text-[11px]">
-              TP1 (+45 p)
-            </span>
+        <div className="text-xs text-slate-400">DẢI TÍN HIỆU GẦN ĐÂY (SỔ TÍN HIỆU)</div>
+        {recentJournal.length === 0 ? (
+          <div className="text-xs text-slate-500 bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48]">
+            Chưa có lệnh nào được ghi sổ. Thực thi tín hiệu từ nút 1-CLICK rồi đánh dấu kết quả (✓TP / ✗SL / =BE) để sổ tự ghi nhận.
           </div>
-
-          <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-emerald-900/60 flex items-center justify-between">
-            <div>
-              <div className="font-bold text-slate-200">#EURUSD SELL @ 1.0850</div>
-              <div className="text-[10px] text-slate-400">Trend Ribbon Pro · M15</div>
-            </div>
-            <span className="px-2 py-1 rounded bg-emerald-950 text-emerald-400 font-bold text-[11px]">
-              TP2 (+52 p)
-            </span>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-xs">
+            {recentJournal.slice(0, 3).map((j) => (
+              <div
+                key={j.id}
+                className={`bg-[#0b0f19] p-2.5 rounded-lg border flex items-center justify-between ${
+                  j.outcome === 'TP' ? 'border-emerald-900/60' : j.outcome === 'SL' ? 'border-rose-900/60' : 'border-sky-900/60'
+                }`}
+              >
+                <div>
+                  <div className="font-bold text-slate-200">
+                    #{j.symbol} {j.direction} @ {j.entryPrice}
+                  </div>
+                  <div className="text-[10px] text-slate-400">{j.engineName} · {j.tier}</div>
+                </div>
+                <span
+                  className={`px-2 py-1 rounded font-bold text-[11px] ${
+                    j.outcome === 'TP'
+                      ? 'bg-emerald-950 text-emerald-400'
+                      : j.outcome === 'SL'
+                        ? 'bg-rose-950 text-rose-400'
+                        : 'bg-sky-950 text-sky-400'
+                  }`}
+                >
+                  {j.outcome === 'TP' ? 'TP' : j.outcome === 'SL' ? 'SL' : j.outcome === 'BE' ? 'BE' : 'TAY'} ({j.rMultiple >= 0 ? '+' : ''}{j.rMultiple}R)
+                </span>
+              </div>
+            ))}
           </div>
-
-          <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-sky-900/60 flex items-center justify-between">
-            <div>
-              <div className="font-bold text-slate-200">#BTCUSD BUY @ 66800</div>
-              <div className="text-[10px] text-slate-400">Mean Reversion · H1</div>
-            </div>
-            <span className="px-2 py-1 rounded bg-sky-950 text-sky-400 font-bold text-[11px]">
-              BE (+0 p)
-            </span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

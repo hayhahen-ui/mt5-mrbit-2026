@@ -1,25 +1,51 @@
 import React, { useState } from 'react';
-import { Sliders, Check, Shield, AlertCircle, Sparkles } from 'lucide-react';
+import { Sliders, Shield, AlertCircle, Newspaper } from 'lucide-react';
+import { NewsEvent } from '../../types';
+import { checkNewsFilter } from '../../lib/scoring';
 
-export const SigTab: React.FC = () => {
+interface SigTabProps {
+  newsEvents: NewsEvent[];
+  selectedSymbol: string;
+}
+
+export const SigTab: React.FC<SigTabProps> = ({ newsEvents, selectedSymbol }) => {
   const [smcEnabled, setSmcEnabled] = useState(true);
   const [trendEnabled, setTrendEnabled] = useState(true);
   const [mrevEnabled, setMrevEnabled] = useState(true);
 
+  const newsFilter = checkNewsFilter(selectedSymbol, newsEvents);
+
   return (
     <div className="space-y-4">
       {/* 1. DÒNG "BỊ CHẶN" (BLOCKED REASONS BANNER) */}
-      <div className="glass-panel p-5 border-l-4 border-l-amber-500 space-y-2">
+      <div className={`glass-panel p-5 border-l-4 space-y-2 ${newsFilter.blocked ? 'border-l-rose-500' : 'border-l-amber-500'}`}>
         <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
           <AlertCircle size={15} />
           <span>DÒNG CHẨN ĐOÁN LÝ DO "BỊ CHẶN" (TRANSPARENT DIAGNOSTICS)</span>
         </div>
         <div className="bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48] text-xs font-mono">
           <div className="text-slate-200 font-semibold">
-            ✓ Trạng thái hiện tại: <span className="text-emerald-400">BÌNH THƯỜNG - TÍN HIỆU SMC HỢP LỆ VỪA KÍCH HOẠT</span>
+            ✓ Trạng thái hiện tại:{' '}
+            <span className={newsFilter.blocked ? 'text-rose-400' : 'text-emerald-400'}>
+              {newsFilter.blocked ? 'CÓ CHẶN — XEM CHI TIẾT BÊN DƯỚI' : 'BÌNH THƯỜNG - TÍN HIỆU SMC HỢP LỆ VỪA KÍCH HOẠT'}
+            </span>
           </div>
           <div className="text-slate-400 text-[11px] mt-1">
             Không có lệnh bị chặn: Bộ lọc Tin tức an toàn, Spread trong ngưỡng 1.4 pips, Tài khoản không vi phạm Drawdown.
+          </div>
+        </div>
+
+        {/* Trạng thái bộ lọc tin tức cho mã đang chọn */}
+        <div className="bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48] text-xs">
+          <div className="flex items-center gap-1.5 font-bold text-slate-200 mb-1">
+            <Newspaper size={13} className="text-sky-400" />
+            BỘ LỌC TIN TỨC — #{selectedSymbol}
+          </div>
+          <div className={`font-mono text-[11px] ${newsFilter.blocked ? 'text-rose-400' : 'text-emerald-400'}`}>
+            {newsFilter.blocked ? `⛔ ${newsFilter.reason}` : `✅ ${newsFilter.reason}`}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1">
+            Tin HIGH của đồng tiền liên quan trong cửa sổ tin sẽ tự động chặn tín hiệu mới.
           </div>
         </div>
       </div>

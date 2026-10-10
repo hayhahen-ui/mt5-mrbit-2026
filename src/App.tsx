@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TabType, Asset, Signal, Position, AccountState, MarketContextState } from './types';
+import { TabType, Asset, Signal, Position, AccountState, MarketContextState, JournalEntry, JournalOutcome } from './types';
 import {
   INITIAL_ASSETS,
   INITIAL_SIGNALS,
@@ -16,6 +16,8 @@ import { RadarTab } from './components/tabs/RadarTab';
 import { NewsTab } from './components/tabs/NewsTab';
 import { LogTab } from './components/tabs/LogTab';
 import { HelpTab } from './components/tabs/HelpTab';
+import { loadJournal, saveJournal, clearJournal, entryFromPosition, OUTCOME_META } from './lib/journal';
+import { checkNewsFilter, totalScore } from './lib/scoring';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('FLIGHT');
@@ -29,11 +31,18 @@ export const App: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  /** Sổ tín hiệu — persist localStorage, nguồn số liệu thật cho tab LOG */
+  const [journal, setJournal] = useState<JournalEntry[]>(() => loadJournal());
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  // Lưu sổ xuống localStorage mỗi khi thay đổi
+  useEffect(() => {
+    saveJournal(journal);
+  }, [journal]);
 
   // 1. Keyboard Shortcuts Listener
   useEffect(() => {
@@ -117,50 +126,38 @@ export const App: React.FC = () => {
     const lot3 = Number((totalLot - lot1 - lot2).toFixed(2));
 
     const nowStr = new Date().toLocaleTimeString('vi-VN');
+    const sigScore = totalScore(sig.scoreBreakdown);
+
+    const mkPos = (
+      tier: 'TP1' | 'TP2' | 'TP3',
+      lot: number,
+      tp: number,
+      idx: number
+    ): Position => ({
+      id: `POS-${Date.now()}-${idx}`,
+      symbol: sig.symbol,
+      type: sig.direction as 'BUY' | 'SELL',
+      lot: lot > 0 ? lot : 0.01,
+      entryPrice: sig.entryPrice,
+      currentPrice: sig.entryPrice,
+      sl: sig.stopLoss,
+      tp,
+      pnl: 0,
+      pips: 0,
+      tier,
+      openTime: nowStr,
+      // Liên kết ngược tới tín hiệu gốc để ghi sổ khi đóng lệnh
+      signalId: sig.id,
+      engine: sig.engine,
+      engineName: sig.engineName,
+      score: sigScore,
+      quality: sig.quality
+    });
 
     const newPositions: Position[] = [
-      {
-        id: `POS-${Date.now()}-1`,
-        symbol: sig.symbol,
-        type: sig.direction as 'BUY' | 'SELL',
-        lot: lot1,
-        entryPrice: sig.entryPrice,
-        currentPrice: sig.entryPrice,
-        sl: sig.stopLoss,
-        tp: sig.tp1,
-        pnl: 0,
-        pips: 0,
-        tier: 'TP1',
-        openTime: nowStr
-      },
-      {
-        id: `POS-${Date.now()}-2`,
-        symbol: sig.symbol,
-        type: sig.direction as 'BUY' | 'SELL',
-        lot: lot2,
-        entryPrice: sig.entryPrice,
-        currentPrice: sig.entryPrice,
-        sl: sig.stopLoss,
-        tp: sig.tp2,
-        pnl: 0,
-        pips: 0,
-        tier: 'TP2',
-        openTime: nowStr
-      },
-      {
-        id: `POS-${Date.now()}-3`,
-        symbol: sig.symbol,
-        type: sig.direction as 'BUY' | 'SELL',
-        lot: lot3 > 0 ? lot3 : 0.01,
-        entryPrice: sig.entryPrice,
-        currentPrice: sig.entryPrice,
-        sl: sig.stopLoss,
-        tp: sig.tp3,
-        pnl: 0,
-        pips: 0,
-        tier: 'TP3',
-        openTime: nowStr
-      }
+      mkPos('TP1', lot1, sig.tp1, 1),
+      mkPos('TP2', lot2, sig.tp2, 2),
+      mkPos('TP3', lot3, sig.tp3, 3)
     ];
 
     setPositions((prev) => [...prev, ...newPositions]);
@@ -170,6 +167,35 @@ export const App: React.FC = () => {
   const handleClosePosition = (id: string) => {
     setPositions((prev) => prev.filter((p) => p.id !== id));
     showToast('Đã đóng vị thế giao dịch.');
+  };
+
+  /**
+   * Đóng lệnh kèm đánh dấu kết quả → tự ghi vào sổ tín hiệu (Trade.2026-style).
+   * Giá thoát: TP → giá TP của tầng; SL → giá SL; BE → giá vào; MANUAL → giá hiện tại.
+   */
+  const handleCloseWithOutcome = (id: string, outcome: JournalOutcome) => {
+    const pos = positions.find((p) => p.id === id);
+    if (!pos) return;
+    const asset = assets.find((a) => a.symbol === pos.symbol);
+    const digits = asset ? asset.digits : 2;
+    const exitPrice =
+      outcome === 'TP' ? pos.tp
+      : outcome === 'SL' ? pos.sl
+      : outcome === 'BE' ? pos.entryPrice
+      : pos.currentPrice;
+    const entry = entryFromPosition(pos, outcome, exitPrice, digits);
+    setJournal((prev) => [...prev, entry]);
+    setPositions((prev) => prev.filter((p) => p.id !== id));
+    const rTxt = `${entry.rMultiple >= 0 ? '+' : ''}${entry.rMultiple}R`;
+    showToast(`📝 Đã ghi sổ: #${pos.symbol} ${pos.tier} ${OUTCOME_META[outcome].label} (${rTxt})`);
+  };
+
+  const handleClearJournal = () => {
+    if (window.confirm('Xóa toàn bộ sổ tín hiệu trên máy này? Hành động không thể hoàn tác.')) {
+      clearJournal();
+      setJournal([]);
+      showToast('Đã xóa toàn bộ sổ tín hiệu.');
+    }
   };
 
   const handleMoveToBE = (id: string) => {
@@ -246,10 +272,13 @@ export const App: React.FC = () => {
                   onExecuteTrade={handleExecuteTrade}
                   onClosePosition={handleClosePosition}
                   onMoveToBE={handleMoveToBE}
+                  onCloseWithOutcome={handleCloseWithOutcome}
+                  newsFilter={checkNewsFilter(selectedAsset.symbol, INITIAL_NEWS)}
+                  recentJournal={journal}
                 />
               )}
               {activeTab === 'CTX' && <CtxTab marketContext={marketContext} asset={selectedAsset} />}
-              {activeTab === 'SIG' && <SigTab />}
+              {activeTab === 'SIG' && <SigTab newsEvents={INITIAL_NEWS} selectedSymbol={selectedAsset.symbol} />}
               {activeTab === 'RADAR' && (
                 <RadarTab
                   assets={assets}
@@ -262,7 +291,7 @@ export const App: React.FC = () => {
                 />
               )}
               {activeTab === 'NEWS' && <NewsTab newsEvents={INITIAL_NEWS} />}
-              {activeTab === 'LOG' && <LogTab />}
+              {activeTab === 'LOG' && <LogTab journal={journal} onClearJournal={handleClearJournal} />}
               {activeTab === 'HELP' && <HelpTab />}
             </div>
           )}

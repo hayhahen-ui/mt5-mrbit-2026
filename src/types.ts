@@ -3,6 +3,54 @@ export type TabType = 'FLIGHT' | 'CTX' | 'SIG' | 'RADAR' | 'NEWS' | 'LOG' | 'HEL
 export type SignalDirection = 'BUY' | 'SELL' | 'FLAT';
 export type QualityGrade = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'Q5';
 export type EngineId = 'SMC' | 'TREND' | 'MEAN_REV';
+export type SignalVerdict = 'MANH' | 'TRUNG_BINH' | 'YEU' | 'BO_QUA';
+
+/** Chi tiết chấm điểm từng yếu tố — minh bạch như Trade.2026 */
+export interface ScoreFactor {
+  id: string;          // 'cau_truc' | 'nen' | 'ob_fvg' | 'phien' | 'rr' | 'spread' | 'news'
+  label: string;       // 'Cấu trúc BOS/CHoCH'
+  points: number;      // điểm đạt được
+  maxPoints: number;   // điểm tối đa của yếu tố
+  passed: boolean;
+  detail: string;      // diễn giải ngắn
+}
+
+/** Bản ghi sổ tín hiệu — kết quả thật của từng lệnh đã đóng */
+export type JournalOutcome = 'TP' | 'SL' | 'BE' | 'MANUAL';
+
+export interface JournalEntry {
+  id: string;
+  symbol: string;
+  direction: 'BUY' | 'SELL';
+  engine: EngineId;
+  engineName: string;
+  tier: 'TP1' | 'TP2' | 'TP3' | 'SINGLE';
+  lot: number;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  score: number;
+  quality: QualityGrade;
+  openTime: string;   // ISO
+  closeTime: string;  // ISO
+  outcome: JournalOutcome;
+  exitPrice: number;
+  rMultiple: number;  // số R đạt được (âm khi thua)
+  pips: number;
+  note?: string;
+}
+
+export interface JournalStats {
+  total: number;
+  wins: number;
+  losses: number;
+  breakEvens: number;
+  winRate: number;      // %
+  totalR: number;
+  avgR: number;
+  profitFactor: number; // tổng R thắng / |tổng R thua|
+  totalPips: number;
+}
 
 export interface Signal {
   id: string;
@@ -29,6 +77,9 @@ export interface Signal {
   rationale: string;
   isHeadsUp: boolean;
   timestamp: string;
+  /** Chi tiết chấm điểm minh bạch (Trade.2026-style). Nếu thiếu, UI tự suy từ quality. */
+  scoreBreakdown?: ScoreFactor[];
+  verdict?: SignalVerdict;
 }
 
 export interface Asset {
@@ -85,6 +136,12 @@ export interface Position {
   pips: number;
   tier: 'TP1' | 'TP2' | 'TP3' | 'SINGLE';
   openTime: string;
+  /** Liên kết ngược tới tín hiệu gốc để ghi sổ khi đóng lệnh */
+  signalId?: string;
+  engine?: EngineId;
+  engineName?: string;
+  score?: number;
+  quality?: QualityGrade;
 }
 
 export interface NewsEvent {

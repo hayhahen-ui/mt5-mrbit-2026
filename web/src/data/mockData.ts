@@ -1,4 +1,35 @@
-import { Asset, Signal, MarketContextState, AccountState, NewsEvent } from '../types';
+import { Asset, Signal, MarketContextState, AccountState, NewsEvent, ScoreFactor } from '../types';
+
+/** Thang chấm điểm minh bạch 100đ — 7 yếu tố (đồng bộ chuẩn Trade.2026) */
+const SCORE_XAUUSD: ScoreFactor[] = [
+  { id: 'cau_truc', label: 'Cấu trúc BOS/CHoCH', points: 18, maxPoints: 20, passed: true, detail: 'Phá vỡ đỉnh phụ + đóng nến trên BOS' },
+  { id: 'ob_fvg', label: 'Order Block / FVG', points: 17, maxPoints: 20, passed: true, detail: 'Retest FVG tăng + phản ứng Demand OB' },
+  { id: 'nen', label: 'Nến xác nhận', points: 13, maxPoints: 15, passed: true, detail: 'Pinbar tăng đuôi dài tại vùng cầu' },
+  { id: 'phien', label: 'Phiên giao dịch', points: 8, maxPoints: 10, passed: true, detail: 'Phiên London mở cửa, thanh khoản cao' },
+  { id: 'rr', label: 'Tỉ lệ RR', points: 13, maxPoints: 15, passed: true, detail: 'RR tới TP1 = 1.0, TP2 = 2.06' },
+  { id: 'spread', label: 'Spread trong ngưỡng', points: 8, maxPoints: 10, passed: true, detail: 'Spread 1.4 pips < ngưỡng 2.0' },
+  { id: 'news', label: 'Lọc tin tức', points: 8, maxPoints: 10, passed: true, detail: 'Không có tin HIGH trong cửa sổ tin' },
+];
+
+const SCORE_EURUSD: ScoreFactor[] = [
+  { id: 'cau_truc', label: 'Cấu trúc BOS/CHoCH', points: 15, maxPoints: 20, passed: true, detail: 'Phá vỡ đáy phụ, cấu trúc giảm xác nhận' },
+  { id: 'ob_fvg', label: 'Order Block / FVG', points: 14, maxPoints: 20, passed: true, detail: 'Giá hồi về vùng cung, chưa chạm OB mạnh' },
+  { id: 'nen', label: 'Nến xác nhận', points: 11, maxPoints: 15, passed: true, detail: 'Nến từ chối tăng thân trung bình' },
+  { id: 'phien', label: 'Phiên giao dịch', points: 7, maxPoints: 10, passed: true, detail: 'Cuối phiên London, thanh khoản vừa' },
+  { id: 'rr', label: 'Tỉ lệ RR', points: 11, maxPoints: 15, passed: true, detail: 'RR tới TP1 = 1.0, TP2 = 2.0' },
+  { id: 'spread', label: 'Spread trong ngưỡng', points: 7, maxPoints: 10, passed: true, detail: 'Spread 0.8 pips < ngưỡng 2.0' },
+  { id: 'news', label: 'Lọc tin tức', points: 7, maxPoints: 10, passed: true, detail: 'Tin EUR MED 15:00 — ngoài cửa sổ vào lệnh' },
+];
+
+const SCORE_BTCUSD: ScoreFactor[] = [
+  { id: 'cau_truc', label: 'Cấu trúc BOS/CHoCH', points: 19, maxPoints: 20, passed: true, detail: 'Quét đáy phiên Á + BOS tăng H4 rõ ràng' },
+  { id: 'ob_fvg', label: 'Order Block / FVG', points: 18, maxPoints: 20, passed: true, detail: 'Phản ứng mạnh tại Demand OB H4' },
+  { id: 'nen', label: 'Nến xác nhận', points: 13, maxPoints: 15, passed: true, detail: 'Nến nhấn chìm tăng trên H1' },
+  { id: 'phien', label: 'Phiên giao dịch', points: 9, maxPoints: 10, passed: true, detail: 'Phiên Mỹ mở cửa, biến động thuận lợi' },
+  { id: 'rr', label: 'Tỉ lệ RR', points: 13, maxPoints: 15, passed: true, detail: 'RR tới TP1 = 1.5, TP2 = 3.25' },
+  { id: 'spread', label: 'Spread trong ngưỡng', points: 8, maxPoints: 10, passed: true, detail: 'Spread 12.0 trong ngưỡng crypto' },
+  { id: 'news', label: 'Lọc tin tức', points: 8, maxPoints: 10, passed: true, detail: 'Không có tin HIGH trong cửa sổ tin' },
+];
 
 export const INITIAL_ASSETS: Asset[] = [
   { symbol: 'XAUUSD', name: 'Gold / US Dollar', category: 'Metals', price: 2652.40, change24h: 1.25, spread: 1.4, trendH1: 'BULL', signalDir: 'BUY', quality: 'Q5', digits: 2 },
@@ -36,7 +67,9 @@ export const INITIAL_SIGNALS: Record<string, Signal> = {
     suggestedLot: 0.50,
     rationale: 'SMC Mitigation: FVG Retest + Bullish Pinbar + Phá vỡ cấu trúc đỉnh phụ (BOS)',
     isHeadsUp: false,
-    timestamp: 'Vừa kích hoạt'
+    timestamp: 'Vừa kích hoạt',
+    scoreBreakdown: SCORE_XAUUSD,
+    verdict: 'MANH'
   },
   EURUSD: {
     id: 'sig-eur-1',
@@ -62,7 +95,9 @@ export const INITIAL_SIGNALS: Record<string, Signal> = {
     suggestedLot: 1.20,
     rationale: 'Trend Pullback: Giá hồi về dải EMA Ribbon 21-50 và đóng nến từ chối giảm',
     isHeadsUp: false,
-    timestamp: '15 phút trước'
+    timestamp: '15 phút trước',
+    scoreBreakdown: SCORE_EURUSD,
+    verdict: 'TRUNG_BINH'
   },
   BTCUSD: {
     id: 'sig-btc-1',
@@ -88,7 +123,9 @@ export const INITIAL_SIGNALS: Record<string, Signal> = {
     suggestedLot: 0.15,
     rationale: 'Liquidity Sweep: Quét đáy phiên Á + Phản ứng Order Block tăng trưởng H4',
     isHeadsUp: false,
-    timestamp: '42 phút trước'
+    timestamp: '42 phút trước',
+    scoreBreakdown: SCORE_BTCUSD,
+    verdict: 'MANH'
   }
 };
 
