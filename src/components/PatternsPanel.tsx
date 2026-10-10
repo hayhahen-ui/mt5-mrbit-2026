@@ -46,7 +46,7 @@ export const PatternsPanel: React.FC = () => {
         </div>
       )}
       {hasKey && rows.length === 0 && (
-        <div className="text-[11px] text-slate-400">Đang tải nến… (chu kỳ đầu mất ~1 phút cho 9 cặp)</div>
+        <div className="text-[11px] text-slate-400">Đang tải nến… (chu kỳ đầu mất ~1.5 phút cho 11 mã)</div>
       )}
       {rows.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">

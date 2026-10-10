@@ -66,8 +66,9 @@ export const TwelvedataSettings: React.FC = () => {
       </div>
       <p className="text-[11px] text-slate-400">
         Key miễn phí tại <span className="text-sky-300 font-mono">twelvedata.com</span> (đăng ký 2 phút).
-        Cho nến 5 phút thật của 9 cặp forex → radar/heatmap có tín hiệu intraday thật,
-        thay vì giá ER-API đứng yên cả ngày. Free tier 800 credit/ngày — app dùng ~650.
+        Cho nến 5 phút thật của 9 cặp forex + Vàng + Bạc → radar/heatmap/mẫu hình nến
+        có dữ liệu intraday thật, thay vì giá ER-API đứng yên cả ngày.
+        Free tier 800 credit/ngày — app dùng ~530.
       </p>
       <div className="flex gap-2 flex-wrap">
         <input
@@ -106,7 +107,7 @@ export const TwelvedataSettings: React.FC = () => {
         </div>
       )}
       <div className="text-[10px] font-mono text-slate-500">
-        credit đã dùng hôm nay: {tdUsageToday()}/800 · {TD_LIST.length} cặp · chu kỳ 20 phút
+        credit đã dùng hôm nay: {tdUsageToday()}/800 · {TD_LIST.length} mã · chu kỳ 30 phút
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { Asset, Signal, NewsEvent, MarketSnapshot, DataSource } from '../types';
 import { INITIAL_ASSETS } from '../data/mockData';
 import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
 import { Quote } from '../types';
-import { getTdKey, tdCandles, TD_LIST, tdHasQuota, sleep, TD_GAP_MS } from '../lib/twelvedata';
+import { getTdKey, tdCandles, TD_LIST, TD_QUOTE_LIST, tdHasQuota, sleep, TD_GAP_MS } from '../lib/twelvedata';
 import { mergeTdCandles } from '../lib/tdStore';
 import { getGhPat, ghAutoSync, ghSyncNow } from '../lib/ghSync';
 import { recordPricePoints } from '../lib/priceHistory';
@@ -52,7 +52,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
   /** Ghi đè quote forex bằng giá TwelveData nếu còn tươi (<45'). */
   const tdOverride = (quotes: Record<string, Quote>): Record<string, Quote> => {
     const now = Date.now();
-    for (const sym of TD_LIST) {
+    for (const sym of TD_QUOTE_LIST) {
       const q = tdRef.current[sym];
       if (q && now - q.at < 45 * 60_000) {
         quotes[sym] = {
@@ -257,7 +257,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       const news = await fetchEconomicCalendar();
       applyQuotes(quotes, news);
     }, FOREX_POLL_MS);
-    // TwelveData: làm mới nến 5m mỗi 20 phút (~650 credit/ngày, trong hạn 800)
+    // TwelveData: làm mới nến 5m mỗi 30 phút (~530 credit/ngày cho 11 mã, trong hạn 800)
     // GitHub auto-sync masterdata mỗi 15 phút (chỉ khi user bật + có PAT)
     const ghId = window.setInterval(async () => {
       try {
@@ -272,7 +272,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
         setState((prev) => ({ ...prev, news, newsSource: getNewsSourceName() }));
         applyQuotes(quotes, news);
       }
-    }, 20 * 60_000);
+    }, 30 * 60_000);
     const newsId = window.setInterval(async () => {
       const news = await fetchEconomicCalendar();
       setState((prev) => ({ ...prev, news, newsSource: getNewsSourceName() }));
