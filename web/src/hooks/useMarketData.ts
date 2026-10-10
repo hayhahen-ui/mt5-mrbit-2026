@@ -5,6 +5,7 @@ import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
 import { Quote } from '../types';
 import { getTdKey, tdCandles, TD_LIST, tdHasQuota, sleep, TD_GAP_MS } from '../lib/twelvedata';
 import { mergeTdCandles } from '../lib/tdStore';
+import { getGhPat, ghAutoSync, ghSyncNow } from '../lib/ghSync';
 import { recordPricePoints } from '../lib/priceHistory';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
@@ -257,6 +258,12 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       applyQuotes(quotes, news);
     }, FOREX_POLL_MS);
     // TwelveData: làm mới nến 5m mỗi 20 phút (~650 credit/ngày, trong hạn 800)
+    // GitHub auto-sync masterdata mỗi 15 phút (chỉ khi user bật + có PAT)
+    const ghId = window.setInterval(async () => {
+      try {
+        if (ghAutoSync() && getGhPat()) await ghSyncNow();
+      } catch { /* lỗi mạng thì bỏ qua, lần sau thử lại */ }
+    }, 15 * 60_000);
     const tdId = window.setInterval(async () => {
       const ok = await runTdCycle();
       if (ok) {
@@ -275,6 +282,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       window.clearInterval(forexTimer);
       window.clearInterval(newsId);
       window.clearInterval(tdId);
+      window.clearInterval(ghId);
     };
   }, [applyQuotes]);
 

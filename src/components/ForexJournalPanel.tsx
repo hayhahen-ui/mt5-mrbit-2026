@@ -4,7 +4,8 @@ import {
   heatmap, HEATMAP_SYMBOLS, HEATMAP_TFS, HEATMAP_TF_LABELS, latestPrices, pointCounts,
   priceHistorySize,
 } from '../lib/priceHistory';
-import { Download, Trash2, AlertTriangle, HardDrive } from 'lucide-react';
+import { Download, Trash2, AlertTriangle } from 'lucide-react';
+import { StorageMeter } from './StorageMeter';
 import {
   getForexJournal, lastSnapAt, takeForexSnapshot, heatBias, ForexSnap,
   isJournalFull, clearJournal, journalSize, MAX_SNAPS,
@@ -153,9 +154,12 @@ export const ForexJournalPanel: React.FC = () => {
       <div className="text-[11px] text-slate-400">
         Heatmap % thay đổi giá đa khung, tự tính từ giá thật app thu thập (thay cho MyFxBook heat-map).
         Snapshot 15 phút/lần: giá + heatmap + tâm lý MyFxBook + tin HIGH — lưu append-only, không tự xóa.
-        <span className="font-mono text-slate-500 flex items-center gap-1 mt-0.5">
-          <HardDrive size={10} /> Kho: localStorage trên máy này · journal {journal.length}/{MAX_SNAPS} ({kb(journalSize())}) · giá {kb(priceHistorySize())}
+        <span className="font-mono text-slate-500">
+          {' '}· journal {journal.length}/{MAX_SNAPS} ({kb(journalSize())}) · điểm giá {kb(priceHistorySize())}
         </span>
+        <div className="mt-1.5">
+          <StorageMeter onChanged={() => { setJournal(getForexJournal()); setFull(isJournalFull()); }} />
+        </div>
         <span className="font-mono text-slate-500">
           {' '}· điểm giá đã ghi: {HEATMAP_SYMBOLS.map((x) => `${x}:${counts[x] ?? 0}`).join(' ')}
         </span>

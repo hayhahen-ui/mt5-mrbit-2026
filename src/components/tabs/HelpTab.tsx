@@ -2,6 +2,7 @@ import React from 'react';
 import { AiSettings } from '../AiSettings';
 import { MfSettings } from '../MfSettings';
 import { TwelvedataSettings } from '../TwelvedataSettings';
+import { GhSyncSettings } from '../GhSyncSettings';
 import { HelpCircle, Keyboard, CheckSquare } from 'lucide-react';
 
 export const HelpTab: React.FC = () => {
@@ -25,6 +26,7 @@ export const HelpTab: React.FC = () => {
       <AiSettings />
       <MfSettings />
       <TwelvedataSettings />
+      <GhSyncSettings />
       {/* Keyboard Shortcuts */}
       <div className="glass-panel p-5 space-y-4">
         <div className="flex items-center gap-2">
