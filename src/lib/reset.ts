@@ -5,6 +5,7 @@
  */
 
 import { POSITIONS_KEY } from './positions';
+import { idbClear } from './idb';
 
 export const RESET_KEYS = [
   'nexuspilot-journal-v1',
@@ -21,6 +22,9 @@ export function resetAllLocalData(): void {
       /* bỏ qua */
     }
   }
+  // Xóa cả kho lạnh IndexedDB (user bấm tay xác nhận)
+  idbClear('kaizen').catch(() => { /* noop */ });
+  idbClear('neural').catch(() => { /* noop */ });
 }
 
 /** Dấu mốc reset — để UI hiển thị "thống kê từ HH:MM DD/MM" */

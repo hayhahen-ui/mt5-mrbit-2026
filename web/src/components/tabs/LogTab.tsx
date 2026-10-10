@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Download, Trash2, BookOpen, FlaskConical, RotateCcw, BarChart3 } from 'lucide-react';
 import { JournalEntry } from '../../types';
 import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
-import { analyzeKaizen } from '../../lib/kaizen';
+import { analyzeKaizen, analyzeKaizenFull } from '../../lib/kaizen';
+import { KaizenAnalysis } from '../../types';
 import { fmtLocalTime } from '../../lib/time';
 import { entryPnlUsd, fmtUsd, realizedPnlUsd } from '../../lib/account';
 
@@ -54,7 +55,13 @@ export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClear
   const resetMarkTxt = resetMark
     ? new Date(resetMark).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
     : null;
-  const kaizen = analyzeKaizen();
+  // Phân tích Kaizen trên TOÀN BỘ lịch sử (nóng + IndexedDB); khởi đầu dùng cache nóng cho nhanh
+  const [kaizen, setKaizen] = useState<KaizenAnalysis>(() => analyzeKaizen());
+  useEffect(() => {
+    let alive = true;
+    analyzeKaizenFull().then((full) => { if (alive) setKaizen(full); }).catch(() => { /* giữ cache nóng */ });
+    return () => { alive = false; };
+  }, []);
 
   const handleDownloadReport = () => {
     const rows = journal

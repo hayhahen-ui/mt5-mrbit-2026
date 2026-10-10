@@ -6,6 +6,8 @@ import { Quote } from '../types';
 import { getTdKey, tdCandles, TD_LIST, TD_QUOTE_LIST, tdHasQuota, sleep, TD_GAP_MS, recordTdError, clearTdError } from '../lib/twelvedata';
 import { mergeTdCandles } from '../lib/tdStore';
 import { getGhPat, ghAutoSync, ghSyncNow } from '../lib/ghSync';
+import { migrateKaizenToIdb } from '../lib/kaizen';
+import { migrateNeuralToIdb } from '../lib/neural/repository';
 import { recordPricePoints } from '../lib/priceHistory';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
@@ -218,6 +220,9 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Di trú nhật ký nặng sang IndexedDB (1 lần, không mất dữ liệu)
+      migrateKaizenToIdb().catch(() => { /* noop */ });
+      migrateNeuralToIdb().catch(() => { /* noop */ });
       const tdPromise = runTdCycle();
       const [btcHist, ethHist, news] = await Promise.all([
         fetchKrakenHistory('XBTUSD', 60),
