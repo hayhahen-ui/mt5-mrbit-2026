@@ -1,10 +1,24 @@
 {
-  "name": "nexuspilot-workspace",
-  "version": "3.0.0",
+  "name": "nexuspilot-cockpit-web",
   "private": true,
+  "version": "3.0.0",
+  "type": "module",
   "scripts": {
-    "build": "cd web && npm run build",
-    "dev": "cd web && npm run dev",
-    "start": "cd web && npm run preview"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
   }
 }

@@ -1,0 +1,273 @@
+import React, { useState, useEffect } from 'react';
+import { TabType, Asset, Signal, Position, AccountState, MarketContextState } from './types';
+import {
+  INITIAL_ASSETS,
+  INITIAL_SIGNALS,
+  INITIAL_MARKET_CONTEXT,
+  INITIAL_ACCOUNT,
+  INITIAL_NEWS
+} from './data/mockData';
+import { Header } from './components/Header';
+import { LeftDock } from './components/LeftDock';
+import { FlightTab } from './components/tabs/FlightTab';
+import { CtxTab } from './components/tabs/CtxTab';
+import { SigTab } from './components/tabs/SigTab';
+import { RadarTab } from './components/tabs/RadarTab';
+import { NewsTab } from './components/tabs/NewsTab';
+import { LogTab } from './components/tabs/LogTab';
+import { HelpTab } from './components/tabs/HelpTab';
+
+export const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('FLIGHT');
+  const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
+  const [selectedAsset, setSelectedAsset] = useState<Asset>(INITIAL_ASSETS[0]);
+  const [signals, setSignals] = useState(INITIAL_SIGNALS);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [account, setAccount] = useState<AccountState>(INITIAL_ACCOUNT);
+  const [marketContext, setMarketContext] = useState<MarketContextState>(INITIAL_MARKET_CONTEXT);
+  const [isDockOpen, setIsDockOpen] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // 1. Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+
+      const key = e.key.toUpperCase();
+      switch (key) {
+        case 'F': setActiveTab('FLIGHT'); break;
+        case 'X': setActiveTab('CTX'); break;
+        case 'S': setActiveTab('SIG'); break;
+        case 'D': setActiveTab('RADAR'); break;
+        case 'N': setActiveTab('NEWS'); break;
+        case 'L': setActiveTab('LOG'); break;
+        case 'H': setActiveTab('HELP'); break;
+        case 'K': setIsDockOpen((prev) => !prev); break;
+        case 'M': setIsMinimized((prev) => !prev); break;
+        case 'ESCAPE': setActiveTab('FLIGHT'); break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 2. Real-time Market Simulation & Candle Timer Tick
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Countdown candle timer
+      setMarketContext((prev) => ({
+        ...prev,
+        candleRemainingSec: prev.candleRemainingSec > 0 ? prev.candleRemainingSec - 1 : 900
+      }));
+
+      // Micro price fluctuation
+      setAssets((prev) =>
+        prev.map((a) => {
+          const delta = (Math.random() - 0.49) * (a.category === 'Crypto' ? 8.0 : (a.category === 'Metals' ? 0.25 : 0.00015));
+          const newPrice = Number((a.price + delta).toFixed(a.digits));
+          return { ...a, price: newPrice };
+        })
+      );
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update selectedAsset price in sync
+  useEffect(() => {
+    const found = assets.find((a) => a.symbol === selectedAsset.symbol);
+    if (found && found.price !== selectedAsset.price) {
+      setSelectedAsset(found);
+    }
+  }, [assets, selectedAsset.symbol]);
+
+  // Update open positions floating PnL
+  useEffect(() => {
+    if (positions.length === 0) return;
+    setPositions((prev) =>
+      prev.map((p) => {
+        const curAsset = assets.find((a) => a.symbol === p.symbol);
+        if (!curAsset) return p;
+        const diff = p.type === 'BUY' ? curAsset.price - p.entryPrice : p.entryPrice - curAsset.price;
+        const pips = diff / (curAsset.category === 'Forex' ? 0.0001 : 0.1);
+        const pnl = pips * p.lot * (curAsset.category === 'Forex' ? 10 : 1);
+        return {
+          ...p,
+          currentPrice: curAsset.price,
+          pips: Number(pips.toFixed(1)),
+          pnl: Number(pnl.toFixed(2))
+        };
+      })
+    );
+  }, [assets]);
+
+  // 1-Click Order Execution: 3-Tier Split
+  const handleExecuteTrade = (sig: Signal, totalLot: number) => {
+    const lot1 = Number((totalLot * 0.5).toFixed(2));
+    const lot2 = Number((totalLot * 0.3).toFixed(2));
+    const lot3 = Number((totalLot - lot1 - lot2).toFixed(2));
+
+    const nowStr = new Date().toLocaleTimeString('vi-VN');
+
+    const newPositions: Position[] = [
+      {
+        id: `POS-${Date.now()}-1`,
+        symbol: sig.symbol,
+        type: sig.direction as 'BUY' | 'SELL',
+        lot: lot1,
+        entryPrice: sig.entryPrice,
+        currentPrice: sig.entryPrice,
+        sl: sig.stopLoss,
+        tp: sig.tp1,
+        pnl: 0,
+        pips: 0,
+        tier: 'TP1',
+        openTime: nowStr
+      },
+      {
+        id: `POS-${Date.now()}-2`,
+        symbol: sig.symbol,
+        type: sig.direction as 'BUY' | 'SELL',
+        lot: lot2,
+        entryPrice: sig.entryPrice,
+        currentPrice: sig.entryPrice,
+        sl: sig.stopLoss,
+        tp: sig.tp2,
+        pnl: 0,
+        pips: 0,
+        tier: 'TP2',
+        openTime: nowStr
+      },
+      {
+        id: `POS-${Date.now()}-3`,
+        symbol: sig.symbol,
+        type: sig.direction as 'BUY' | 'SELL',
+        lot: lot3 > 0 ? lot3 : 0.01,
+        entryPrice: sig.entryPrice,
+        currentPrice: sig.entryPrice,
+        sl: sig.stopLoss,
+        tp: sig.tp3,
+        pnl: 0,
+        pips: 0,
+        tier: 'TP3',
+        openTime: nowStr
+      }
+    ];
+
+    setPositions((prev) => [...prev, ...newPositions]);
+    showToast(`⚡ 1-Click: Đã mở 3 vị thế ${sig.direction} #${sig.symbol} (TP1 50%, TP2 30%, TP3 20%)`);
+  };
+
+  const handleClosePosition = (id: string) => {
+    setPositions((prev) => prev.filter((p) => p.id !== id));
+    showToast('Đã đóng vị thế giao dịch.');
+  };
+
+  const handleMoveToBE = (id: string) => {
+    setPositions((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, sl: p.entryPrice } : p))
+    );
+    showToast('Đã dời Stop Loss về hòa vốn (BE). Giao dịch an toàn!');
+  };
+
+  const handleCloseAllPositions = () => {
+    if (positions.length === 0) {
+      showToast('Hiện không có vị thế nào đang mở.');
+      return;
+    }
+    setPositions([]);
+    showToast('⚠️ Đã đóng toàn bộ các vị thế đang mở (Emergency Close All).');
+  };
+
+  const handleTestTelegram = () => {
+    showToast('🔔 Đã gửi tín hiệu kiểm tra Telegram thành công qua Webhook!');
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#17223b] border border-sky-500/60 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 font-mono text-xs animate-bounce">
+          <span className="text-base">🚀</span>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Header Bar */}
+      <Header
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedAsset={selectedAsset}
+        assets={assets}
+        onSelectAsset={(a) => {
+          setSelectedAsset(a);
+          showToast(`Đã chuyển Cockpit sang #${a.symbol}`);
+        }}
+        isDockOpen={isDockOpen}
+        toggleDock={() => setIsDockOpen(!isDockOpen)}
+        soundEnabled={soundEnabled}
+        setSoundEnabled={setSoundEnabled}
+        isMinimized={isMinimized}
+        toggleMinimize={() => setIsMinimized(!isMinimized)}
+      />
+
+      {/* Main Body */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Dock (Key K) */}
+        <LeftDock
+          isOpen={isDockOpen}
+          onClose={() => setIsDockOpen(false)}
+          account={account}
+          marketContext={marketContext}
+          selectedAsset={selectedAsset}
+          onCloseAllPositions={handleCloseAllPositions}
+          onTestTelegram={handleTestTelegram}
+          onUpdateRiskPct={(pct) => setAccount((prev) => ({ ...prev, riskPct: pct }))}
+        />
+
+        {/* Content Area */}
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+          {!isMinimized && (
+            <div className="max-w-6xl mx-auto">
+              {activeTab === 'FLIGHT' && (
+                <FlightTab
+                  signal={signals[selectedAsset.symbol]}
+                  asset={selectedAsset}
+                  positions={positions.filter((p) => p.symbol === selectedAsset.symbol)}
+                  onExecuteTrade={handleExecuteTrade}
+                  onClosePosition={handleClosePosition}
+                  onMoveToBE={handleMoveToBE}
+                />
+              )}
+              {activeTab === 'CTX' && <CtxTab marketContext={marketContext} asset={selectedAsset} />}
+              {activeTab === 'SIG' && <SigTab />}
+              {activeTab === 'RADAR' && (
+                <RadarTab
+                  assets={assets}
+                  selectedAsset={selectedAsset}
+                  onSelectAsset={(a) => {
+                    setSelectedAsset(a);
+                    setActiveTab('FLIGHT');
+                    showToast(`Chuyển sang #${a.symbol}`);
+                  }}
+                />
+              )}
+              {activeTab === 'NEWS' && <NewsTab newsEvents={INITIAL_NEWS} />}
+              {activeTab === 'LOG' && <LogTab />}
+              {activeTab === 'HELP' && <HelpTab />}
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+};
