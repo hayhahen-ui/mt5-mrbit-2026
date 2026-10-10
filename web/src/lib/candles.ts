@@ -48,37 +48,36 @@ export async function fetchKrakenOHLC(symbol: string, intervalMin = 15): Promise
   }
 }
 
-/* ---------- Nến tổng hợp từ giá poll (mã không có OHLC) ---------- */
+/* ---------- Lịch sử quote cho mã không có OHLC (vẽ đường giá) ---------- */
 
-const BUCKET_MS = 5 * 60 * 1000;
-const MAX_CANDLES = 288; // 24h nến 5 phút
+export interface QuotePoint {
+  t: number; // ms
+  price: number;
+}
 
-const store = new Map<string, Candle[]>();
+const MAX_POINTS = 300;
 
-export function pushQuote(symbol: string, price: number, ts: number): void {
+const quoteStore = new Map<string, QuotePoint[]>();
+
+/** Gom mỗi lần poll thành 1 điểm giá (kể cả khi giá không đổi quá 30s) */
+export function pushQuotePoint(symbol: string, price: number, ts: number): void {
   if (!(price > 0)) return;
-  let arr = store.get(symbol);
+  let arr = quoteStore.get(symbol);
   if (!arr) {
     arr = [];
-    store.set(symbol, arr);
+    quoteStore.set(symbol, arr);
   }
-  const bucketT = Math.floor(ts / BUCKET_MS) * BUCKET_MS;
-  const last = arr[arr.length - 1];
-  if (last && last.t === bucketT) {
-    last.c = price;
-    if (price > last.h) last.h = price;
-    if (price < last.l) last.l = price;
-  } else {
-    arr.push({ t: bucketT, o: price, h: price, l: price, c: price });
-    if (arr.length > MAX_CANDLES) arr.splice(0, arr.length - MAX_CANDLES);
-  }
+  arr.push({ t: ts, price });
+  if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
 }
 
-export function getSynthCandles(symbol: string): Candle[] {
-  return store.get(symbol) || [];
+export function getQuoteHistory(symbol: string): QuotePoint[] {
+  return quoteStore.get(symbol) || [];
 }
 
-/** Nhãn nguồn nến để UI hiển thị trung thực */
+/** Nhãn nguồn dữ liệu để UI hiển thị trung thực */
 export function candleSourceLabel(symbol: string): string {
-  return hasNativeOHLC(symbol) ? 'Nến sàn Kraken (thật)' : 'Nến tổng hợp từ giá realtime';
+  return hasNativeOHLC(symbol)
+    ? 'Nến sàn Kraken (thật) · nến 15m'
+    : 'Đường giá từ quote realtime — không phải nến sàn';
 }
