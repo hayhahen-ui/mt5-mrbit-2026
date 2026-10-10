@@ -19,6 +19,7 @@ import { useMarketData } from './hooks/useMarketData';
 import { SessionClocks } from './components/SessionClocks';
 import { DashboardStrip } from './components/DashboardStrip';
 import { findLatestKaizenFor, linkKaizenOutcome, clearKaizen, loadKaizen } from './lib/kaizen';
+import { resetAllLocalData, markResetTime, getResetMark } from './lib/reset';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('FLIGHT');
@@ -34,6 +35,7 @@ export const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   /** Sổ tín hiệu — persist localStorage, nguồn số liệu thật cho tab LOG */
   const [journal, setJournal] = useState<JournalEntry[]>(() => loadJournal());
+  const [resetMark, setResetMark] = useState<number | null>(() => getResetMark());
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -196,6 +198,19 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleResetAll = () => {
+    if (window.confirm(
+      'RESET TOÀN BỘ DỮ LIỆU?\n\nXóa: sổ tín hiệu, nhật ký Kaizen, bản ghi Neural shadow, lệnh đang mở.\nTừ sau reset, mọi thống kê chỉ tính bản ghi thật mới.\n\nNên XUẤT BÁO CÁO HTML trước nếu cần lưu lại.\nHành động không thể hoàn tác.'
+    )) {
+      resetAllLocalData();
+      markResetTime();
+      setJournal([]);
+      setPositions([]);
+      setResetMark(Date.now());
+      showToast('♻️ Đã reset — từ giờ chỉ tính bản ghi thật mới.');
+    }
+  };
+
   const handleMoveToBE = (id: string) => {
     setPositions((prev) =>
       prev.map((p) => (p.id === id ? { ...p, sl: p.entryPrice } : p))
@@ -303,7 +318,7 @@ export const App: React.FC = () => {
                 />
               )}
               {activeTab === 'NEWS' && <NewsTab newsEvents={news} newsSource={newsSource} />}
-              {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} />}
+              {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} onResetAll={handleResetAll} resetMark={resetMark} />}
               {activeTab === 'HELP' && <HelpTab />}
             </div>
           )}

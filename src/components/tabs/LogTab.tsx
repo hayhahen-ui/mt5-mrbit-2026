@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Trash2, BookOpen, FlaskConical } from 'lucide-react';
+import { Download, Trash2, BookOpen, FlaskConical, RotateCcw } from 'lucide-react';
 import { JournalEntry } from '../../types';
 import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
 import { analyzeKaizen } from '../../lib/kaizen';
@@ -8,11 +8,16 @@ interface LogTabProps {
   journal: JournalEntry[];
   onClearJournal: () => void;
   onClearKaizen: () => void;
+  onResetAll: () => void;
+  resetMark: number | null;
 }
 
-export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClearKaizen }) => {
+export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClearKaizen, onResetAll, resetMark }) => {
   const stats = calcJournalStats(journal);
   const curve = equityCurve(journal);
+  const resetMarkTxt = resetMark
+    ? new Date(resetMark).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+    : null;
   const kaizen = analyzeKaizen();
 
   const handleDownloadReport = () => {
@@ -279,16 +284,19 @@ ${rows}
         )}
       </div>
 
-      {/* Export + Xóa sổ */}
+      {/* Export + Xóa sổ + Reset toàn bộ */}
       <div className="glass-panel p-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="text-sm font-bold text-slate-200">XUẤT BÁO CÁO SỔ TÍN HIỆU (HTML)</div>
           <div className="text-xs text-slate-400">
             Tải về file HTML chứa toàn bộ thống kê thật và lịch sử lệnh từ sổ.
+            {resetMarkTxt && (
+              <span className="text-emerald-400 font-mono"> · Thống kê thật từ {resetMarkTxt} (sau reset)</span>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleDownloadReport}
             disabled={journal.length === 0}
@@ -304,6 +312,14 @@ ${rows}
           >
             <Trash2 size={14} />
             XÓA SỔ
+          </button>
+          <button
+            onClick={onResetAll}
+            title="Xóa sổ tín hiệu + nhật ký Kaizen + bản ghi Neural + lệnh đang mở. Từ sau reset chỉ tính bản ghi thật mới."
+            className="py-2.5 px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-2 transition-all"
+          >
+            <RotateCcw size={14} />
+            RESET TOÀN BỘ
           </button>
         </div>
       </div>
