@@ -1,16 +1,19 @@
 import React from 'react';
-import { Download, Trash2, BookOpen } from 'lucide-react';
+import { Download, Trash2, BookOpen, FlaskConical } from 'lucide-react';
 import { JournalEntry } from '../../types';
 import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
+import { analyzeKaizen } from '../../lib/kaizen';
 
 interface LogTabProps {
   journal: JournalEntry[];
   onClearJournal: () => void;
+  onClearKaizen: () => void;
 }
 
-export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal }) => {
+export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClearKaizen }) => {
   const stats = calcJournalStats(journal);
   const curve = equityCurve(journal);
+  const kaizen = analyzeKaizen();
 
   const handleDownloadReport = () => {
     const rows = journal
@@ -173,6 +176,106 @@ ${rows}
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      {/* PHÂN TÍCH KAIZEN — yếu tố nào đang hiệu quả */}
+      <div className="glass-panel p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+            <FlaskConical size={16} className="text-purple-400" />
+            PHÂN TÍCH KAIZEN — TỐI ƯU TÍN HIỆU TƯƠNG LAI
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-mono">
+              {kaizen.totalEvaluated} lượt đánh giá · {kaizen.totalClosed} lệnh đã đóng
+            </span>
+            <button
+              onClick={() => { if (window.confirm('Xóa nhật ký Kaizen?')) onClearKaizen(); }}
+              disabled={kaizen.totalEvaluated === 0}
+              className="text-[10px] px-2 py-1 rounded bg-[#17223b] text-slate-400 border border-[#243356] hover:text-white disabled:opacity-40"
+            >
+              Xóa NK Kaizen
+            </button>
+          </div>
+        </div>
+
+        {kaizen.totalEvaluated === 0 ? (
+          <div className="text-xs text-slate-500 bg-[#0b0f19] p-4 rounded-lg border border-[#1e2b48] text-center">
+            Engine đang thu thập dữ liệu thật. Nhật ký Kaizen sẽ ghi lại mọi lượt đánh giá tín hiệu
+            (điểm từng yếu tố + bối cảnh thị trường + tin tức) để phân tích tại đây.
+          </div>
+        ) : (
+          <>
+            {/* Hiệu quả theo engine / verdict / phiên */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48]">
+                <div className="font-bold text-slate-300 mb-2">THEO ENGINE</div>
+                {kaizen.byEngine.map((e) => (
+                  <div key={e.engine} className="flex justify-between py-1 font-mono border-b border-[#1e2b48]/50 last:border-0">
+                    <span className="text-slate-400">{e.engine}</span>
+                    <span><strong className={e.winRate >= 50 ? 'text-emerald-400' : 'text-rose-400'}>{e.winRate}%</strong> <span className="text-slate-500">({e.closed}/{e.evaluated})</span></span>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48]">
+                <div className="font-bold text-slate-300 mb-2">THEO VERDICT</div>
+                {kaizen.byVerdict.map((v) => (
+                  <div key={v.verdict} className="flex justify-between py-1 font-mono border-b border-[#1e2b48]/50 last:border-0">
+                    <span className="text-slate-400">{v.verdict}</span>
+                    <span><strong className={v.winRate >= 50 ? 'text-emerald-400' : 'text-rose-400'}>{v.winRate}%</strong> <span className="text-slate-500">({v.closed}/{v.evaluated})</span></span>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48]">
+                <div className="font-bold text-slate-300 mb-2">THEO PHIÊN</div>
+                {kaizen.bySession.map((s) => (
+                  <div key={s.session} className="flex justify-between py-1 font-mono border-b border-[#1e2b48]/50 last:border-0">
+                    <span className="text-slate-400">{s.session}</span>
+                    <span><strong className={s.winRate >= 50 ? 'text-emerald-400' : 'text-rose-400'}>{s.winRate}%</strong> <span className="text-slate-500">({s.closed}/{s.evaluated})</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Hiệu quả từng yếu tố chấm điểm */}
+            <div>
+              <div className="text-xs font-bold text-slate-300 mb-2">HIỆU QUẢ TỪNG YẾU TỐ CHẤM ĐIỂM (khi yếu tố ĐẠT)</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-[#1e2b48] text-slate-400 font-mono">
+                      <th className="py-2">Yếu tố</th>
+                      <th className="text-right">Lượt ĐG</th>
+                      <th className="text-right">Tỉ lệ đạt</th>
+                      <th className="text-right">Lệnh đã đóng</th>
+                      <th className="text-right">Win rate khi đạt</th>
+                      <th className="text-right">Avg R khi đạt</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1e2b48] font-mono">
+                    {kaizen.factors.map((f) => (
+                      <tr key={f.factorId} className="hover:bg-[#17223b]/40">
+                        <td className="py-2 text-slate-200 font-sans font-medium">{f.label}</td>
+                        <td className="text-right text-slate-400">{f.evaluated}</td>
+                        <td className="text-right text-slate-400">{f.evaluated ? Math.round((f.passed / f.evaluated) * 100) : 0}%</td>
+                        <td className="text-right text-slate-400">{f.closedWithPass}</td>
+                        <td className={`text-right font-bold ${f.closedWithPass === 0 ? 'text-slate-500' : f.winRateWhenPassed >= 50 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {f.closedWithPass === 0 ? '—' : `${f.winRateWhenPassed}%`}
+                        </td>
+                        <td className={`text-right font-bold ${f.closedWithPass === 0 ? 'text-slate-500' : f.avgRWhenPassed >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {f.closedWithPass === 0 ? '—' : `${f.avgRWhenPassed >= 0 ? '+' : ''}${f.avgRWhenPassed}R`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="text-[10px] text-slate-500 mt-2">
+                Đọc: yếu tố nào có win rate cao khi đạt → ưu tiên trong tương lai; yếu tố win rate thấp → xem xét hạ điểm hoặc bỏ.
+              </div>
+            </div>
+          </>
         )}
       </div>
 

@@ -33,7 +33,12 @@ export const FlightTab: React.FC<FlightTabProps> = ({
         <div className="text-3xl">🔍</div>
         <div className="text-lg font-bold text-slate-200">Đang quét tìm cơ hội cho #{asset.symbol}</div>
         <div className="text-sm max-w-md mx-auto text-slate-400">
-          Chưa có cấu trúc nến đạt chuẩn (Q3+). Hệ thống đang tiếp tục theo dõi các vùng thanh khoản Order Block & FVG.
+          {(asset.warmup || '0/20') !== '20/20'
+            ? `Engine đang thu thập dữ liệu thật (${asset.warmup || '0/20'} mẫu từ ${asset.sourceName || 'nguồn giá'}). Tín hiệu sẽ xuất hiện khi đủ mẫu.`
+            : 'Chưa có cấu trúc giá đạt chuẩn. Hệ thống tiếp tục theo dõi trên dữ liệu thật.'}
+        </div>
+        <div className="text-[11px] font-mono text-slate-500">
+          Nguồn: {asset.sourceName || '—'} · Cập nhật: {asset.updatedAt ? new Date(asset.updatedAt).toLocaleTimeString('vi-VN') : '—'}
         </div>
       </div>
     );
@@ -70,6 +75,9 @@ export const FlightTab: React.FC<FlightTabProps> = ({
           <div className="flex items-center gap-3 font-mono text-sm">
             <span className="text-slate-400">Bid: <strong className="text-slate-200">{asset.price.toFixed(asset.digits)}</strong></span>
             <span className="text-slate-400">Spread: <strong className="text-sky-400">{asset.spread} pips</strong></span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#17223b] text-slate-400 border border-[#243356]" title={`Nguồn giá: ${asset.sourceName || '—'}`}>
+              {(asset.dataSource || 'OFFLINE') === 'LIVE' ? '🟢' : (asset.dataSource || 'OFFLINE') === 'DAILY' ? '🔵' : (asset.dataSource || 'OFFLINE') === 'SIM' ? '🟡' : '⚪'} {asset.sourceName || 'OFFLINE'}
+            </span>
           </div>
         </div>
 

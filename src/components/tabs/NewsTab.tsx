@@ -1,27 +1,33 @@
 import React from 'react';
 import { NewsEvent } from '../../types';
-import { Calendar, AlertCircle, Clock } from 'lucide-react';
+import { Calendar, AlertCircle, Clock, Radio } from 'lucide-react';
 
 interface NewsTabProps {
   newsEvents: NewsEvent[];
+  newsSource?: string;
 }
 
-export const NewsTab: React.FC<NewsTabProps> = ({ newsEvents }) => {
+export const NewsTab: React.FC<NewsTabProps> = ({ newsEvents, newsSource }) => {
+  const inWindowCount = newsEvents.filter((e) => e.inWindow && e.impact === 'HIGH').length;
   return (
     <div className="space-y-4">
       {/* News Window Alert */}
-      <div className="glass-panel p-4 flex items-center justify-between border-l-4 border-l-sky-500">
+      <div className={`glass-panel p-4 flex items-center justify-between border-l-4 ${inWindowCount > 0 ? 'border-l-rose-500' : 'border-l-sky-500'}`}>
         <div className="flex items-center gap-2.5">
           <Clock size={18} className="text-sky-400" />
           <div>
             <div className="text-xs font-bold text-slate-200">CỬA SỔ LỌC TIN KINH TẾ (NEWS WINDOW GUARD)</div>
             <div className="text-[11px] text-slate-400">
-              Tự động chặn tín hiệu trước 30 phút và sau 15 phút khi có tin đỏ (High Impact).
+              Tự động chặn tín hiệu trước 30 phút và sau 15 phút khi có tin đỏ (High Impact) — tính bằng giờ thật.
             </div>
           </div>
         </div>
-        <span className="text-xs font-mono px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">
-          CỬA SỔ AN TOÀN
+        <span className={`text-xs font-mono px-2.5 py-1 rounded font-bold border ${
+          inWindowCount > 0
+            ? 'bg-rose-950 text-rose-400 border-rose-800'
+            : 'bg-emerald-950 text-emerald-400 border-emerald-800'
+        }`}>
+          {inWindowCount > 0 ? `⛔ ${inWindowCount} TIN HIGH TRONG CỬA SỔ` : 'CỬA SỔ AN TOÀN'}
         </span>
       </div>
 
@@ -30,9 +36,15 @@ export const NewsTab: React.FC<NewsTabProps> = ({ newsEvents }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar size={18} className="text-sky-400" />
-            <span className="font-bold text-sm text-slate-100">LỊCH KINH TẾ 24H (MQL5 NATIVE & FOREX FACTORY)</span>
+            <span className="font-bold text-sm text-slate-100">LỊCH KINH TẾ (ECONOMIC CALENDAR)</span>
           </div>
-          <span className="text-xs text-slate-400 font-mono">Giờ địa phương GMT+7</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#17223b] text-sky-400 border border-[#243356] flex items-center gap-1">
+              <Radio size={11} />
+              Nguồn: {newsSource || '…'}
+            </span>
+            <span className="text-xs text-slate-400 font-mono">Giờ địa phương</span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -49,9 +61,21 @@ export const NewsTab: React.FC<NewsTabProps> = ({ newsEvents }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e2b48] font-mono">
+              {newsEvents.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-6 text-center text-slate-500 text-xs">
+                    Đang tải lịch kinh tế…
+                  </td>
+                </tr>
+              )}
               {newsEvents.map((evt) => (
-                <tr key={evt.id} className="hover:bg-[#17223b]/40">
-                  <td className="py-3 text-slate-300 font-bold">{evt.time}</td>
+                <tr key={evt.id} className={`hover:bg-[#17223b]/40 ${evt.inWindow && evt.impact === 'HIGH' ? 'bg-rose-950/20' : ''}`}>
+                  <td className="py-3 text-slate-300 font-bold">
+                    {evt.time}
+                    {evt.inWindow && evt.impact === 'HIGH' && (
+                      <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-rose-600 text-white font-bold">TRONG CỬA SỔ</span>
+                    )}
+                  </td>
                   <td>
                     <span className="px-2 py-0.5 rounded bg-[#17223b] text-slate-200 font-bold border border-[#243356]">
                       {evt.currency}

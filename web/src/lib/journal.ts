@@ -81,6 +81,8 @@ export function entryFromPosition(
     exitPrice: Number(exitPrice.toFixed(digits)),
     rMultiple,
     pips,
+    marketSnapshot: pos.marketSnapshot,
+    kaizenId: pos.kaizenId,
   };
 }
 

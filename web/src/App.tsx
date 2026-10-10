@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TabType, Asset, Signal, Position, AccountState, MarketContextState, JournalEntry, JournalOutcome } from './types';
 import {
-  INITIAL_ASSETS,
-  INITIAL_SIGNALS,
   INITIAL_MARKET_CONTEXT,
-  INITIAL_ACCOUNT,
-  INITIAL_NEWS
+  INITIAL_ACCOUNT
 } from './data/mockData';
 import { Header } from './components/Header';
 import { LeftDock } from './components/LeftDock';
@@ -18,14 +15,16 @@ import { LogTab } from './components/tabs/LogTab';
 import { HelpTab } from './components/tabs/HelpTab';
 import { loadJournal, saveJournal, clearJournal, entryFromPosition, OUTCOME_META } from './lib/journal';
 import { checkNewsFilter, totalScore } from './lib/scoring';
+import { useMarketData } from './hooks/useMarketData';
+import { findLatestKaizenFor, linkKaizenOutcome, clearKaizen, loadKaizen } from './lib/kaizen';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('FLIGHT');
-  const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
-  const [selectedAsset, setSelectedAsset] = useState<Asset>(INITIAL_ASSETS[0]);
-  const [signals, setSignals] = useState(INITIAL_SIGNALS);
-  const [positions, setPositions] = useState<Position[]>([]);
   const [account, setAccount] = useState<AccountState>(INITIAL_ACCOUNT);
+  // Dữ liệu thị trường THẬT (hook tự poll + engine đánh giá tín hiệu)
+  const { assets, signals, snapshots, news, newsSource, lastUpdated } = useMarketData(account.equity, account.riskPct);
+  const [selectedAsset, setSelectedAsset] = useState<Asset>(assets[0]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [marketContext, setMarketContext] = useState<MarketContextState>(INITIAL_MARKET_CONTEXT);
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -69,23 +68,13 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 2. Real-time Market Simulation & Candle Timer Tick
+  // Đếm ngược nến (giá realtime do useMarketData phụ trách)
   useEffect(() => {
     const interval = setInterval(() => {
-      // Countdown candle timer
       setMarketContext((prev) => ({
         ...prev,
         candleRemainingSec: prev.candleRemainingSec > 0 ? prev.candleRemainingSec - 1 : 900
       }));
-
-      // Micro price fluctuation
-      setAssets((prev) =>
-        prev.map((a) => {
-          const delta = (Math.random() - 0.49) * (a.category === 'Crypto' ? 8.0 : (a.category === 'Metals' ? 0.25 : 0.00015));
-          const newPrice = Number((a.price + delta).toFixed(a.digits));
-          return { ...a, price: newPrice };
-        })
-      );
     }, 1000);
 
     return () => clearInterval(interval);
@@ -127,6 +116,9 @@ export const App: React.FC = () => {
 
     const nowStr = new Date().toLocaleTimeString('vi-VN');
     const sigScore = totalScore(sig.scoreBreakdown);
+    // Liên kết Kaizen: tìm bản ghi đánh giá gần nhất của tín hiệu này
+    const kz = findLatestKaizenFor(sig.symbol, sig.direction as string);
+    const snap = snapshots[sig.symbol];
 
     const mkPos = (
       tier: 'TP1' | 'TP2' | 'TP3',
@@ -151,7 +143,9 @@ export const App: React.FC = () => {
       engine: sig.engine,
       engineName: sig.engineName,
       score: sigScore,
-      quality: sig.quality
+      quality: sig.quality,
+      kaizenId: kz?.id,
+      marketSnapshot: snap
     });
 
     const newPositions: Position[] = [
@@ -185,6 +179,8 @@ export const App: React.FC = () => {
       : pos.currentPrice;
     const entry = entryFromPosition(pos, outcome, exitPrice, digits);
     setJournal((prev) => [...prev, entry]);
+    // Liên kết kết quả vào nhật ký Kaizen để phân tích yếu tố
+    if (pos.kaizenId) linkKaizenOutcome(pos.kaizenId, outcome, entry.rMultiple);
     setPositions((prev) => prev.filter((p) => p.id !== id));
     const rTxt = `${entry.rMultiple >= 0 ? '+' : ''}${entry.rMultiple}R`;
     showToast(`📝 Đã ghi sổ: #${pos.symbol} ${pos.tier} ${OUTCOME_META[outcome].label} (${rTxt})`);
@@ -273,12 +269,12 @@ export const App: React.FC = () => {
                   onClosePosition={handleClosePosition}
                   onMoveToBE={handleMoveToBE}
                   onCloseWithOutcome={handleCloseWithOutcome}
-                  newsFilter={checkNewsFilter(selectedAsset.symbol, INITIAL_NEWS)}
+                  newsFilter={checkNewsFilter(selectedAsset.symbol, news)}
                   recentJournal={journal}
                 />
               )}
               {activeTab === 'CTX' && <CtxTab marketContext={marketContext} asset={selectedAsset} />}
-              {activeTab === 'SIG' && <SigTab newsEvents={INITIAL_NEWS} selectedSymbol={selectedAsset.symbol} />}
+              {activeTab === 'SIG' && <SigTab newsEvents={news} selectedSymbol={selectedAsset.symbol} />}
               {activeTab === 'RADAR' && (
                 <RadarTab
                   assets={assets}
@@ -290,8 +286,8 @@ export const App: React.FC = () => {
                   }}
                 />
               )}
-              {activeTab === 'NEWS' && <NewsTab newsEvents={INITIAL_NEWS} />}
-              {activeTab === 'LOG' && <LogTab journal={journal} onClearJournal={handleClearJournal} />}
+              {activeTab === 'NEWS' && <NewsTab newsEvents={news} newsSource={newsSource} />}
+              {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} />}
               {activeTab === 'HELP' && <HelpTab />}
             </div>
           )}
