@@ -1,6 +1,7 @@
 import React from 'react';
 import { NewsEvent } from '../../types';
 import { Calendar, AlertCircle, Clock, Radio } from 'lucide-react';
+import { AiAsk } from '../AiAsk';
 
 interface NewsTabProps {
   newsEvents: NewsEvent[];
@@ -44,6 +45,24 @@ export const NewsTab: React.FC<NewsTabProps> = ({ newsEvents, newsSource }) => {
               Nguồn: {newsSource || '…'}
             </span>
             <span className="text-xs text-slate-400 font-mono">Giờ địa phương</span>
+            <AiAsk
+              buttonLabel="✨ AI TÓM TẮT TIN"
+              buildPrompt={() => {
+                const highs = newsEvents.filter((e) => e.impact === 'HIGH');
+                const lines = highs.slice(0, 25).map(
+                  (e) => `- [${e.time}] ${e.currency} — ${e.title} (dự báo: ${e.forecast || '—'}, kỳ trước: ${e.previous || '—'})${e.inWindow ? ' ← TRONG CỬA SỔ' : ''}`
+                );
+                return [
+                  `Tóm tắt lịch kinh tế tuần (nguồn: ${newsSource || 'ForexFactory'}), tập trung tin HIGH:`,
+                  ...lines,
+                  '',
+                  'Hãy: 1) Liệt kê 3-5 tin quan trọng nhất cần tránh giao dịch (kèm giờ),',
+                  '2) Nhận định nhanh tác động lên USD/EUR/JPY/XAUUSD,',
+                  '3) Gợi ý khung giờ nào trong tuần cần đứng ngoài. Ngắn gọn, tiếng Việt.',
+                ].join('\n');
+              }}
+              systemPrompt="Bạn là trợ lý phân tích lịch kinh tế cho trader. Trả lời bằng tiếng Việt, ngắn gọn, dạng gạch đầu dòng."
+            />
           </div>
         </div>
 

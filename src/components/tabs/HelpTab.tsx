@@ -1,4 +1,5 @@
 import React from 'react';
+import { AiSettings } from '../AiSettings';
 import { HelpCircle, Keyboard, CheckSquare } from 'lucide-react';
 
 export const HelpTab: React.FC = () => {
@@ -19,6 +20,7 @@ export const HelpTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <AiSettings />
       {/* Keyboard Shortcuts */}
       <div className="glass-panel p-5 space-y-4">
         <div className="flex items-center gap-2">

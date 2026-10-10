@@ -4,6 +4,7 @@ import { TrendingUp, TrendingDown, Target, Shield, Zap, CheckCircle2, ChevronRig
 import { totalScore, maxScore, getVerdict, VERDICT_META, NewsFilterResult } from '../../lib/scoring';
 import { usdPerPipPerLot, pipSizeOf, fmtUsd } from '../../lib/account';
 import { NeuralPanel } from '../NeuralPanel';
+import { AiAsk } from '../AiAsk';
 
 interface FlightTabProps {
   signal: Signal | undefined;
@@ -373,6 +374,34 @@ export const FlightTab: React.FC<FlightTabProps> = ({
             )}
           </div>
 
+      </div>
+
+      {/* AI PHÂN TÍCH TÍN HIỆU */}
+      <AiAsk
+        buttonLabel="✨ AI PHÂN TÍCH TÍN HIỆU NÀY"
+        buildPrompt={() => {
+          const factors = (signal.scoreBreakdown || [])
+            .map((f) => `- ${f.label}: ${f.passed ? 'ĐẠT' : 'không đạt'} (${f.points}/${f.maxPoints}) — ${f.detail || ''}`)
+            .join('\n');
+          const news = snapshot?.newsNear?.length ? snapshot.newsNear.join('; ') : 'không có';
+          return [
+            `Phân tích tín hiệu giao dịch #${signal.symbol} (${signal.timeframe || 'M15'}):`,
+            `- Hướng: ${signal.direction}, chất lượng ${signal.quality}, điểm ${score}/${scoreMax}, engine ${signal.engineName || signal.engine}`,
+            `- Entry: ${entry}, SL: ${planSL}, TP1: ${planTP[0]}, TP2: ${planTP[1]}, TP3: ${planTP[2]}, lot kế hoạch: ${planLot}`,
+            `- Rủi ro tối đa: $${totalRiskUsd}, lãi tối đa: $${totalWinUsd}`,
+            `- Chi tiết chấm điểm:\n${factors}`,
+            `- Phiên đang mở: ${snapshot?.session || '—'}, biến động: ${snapshot?.atrProxy ?? '—'}%`,
+            `- Tin HIGH gần (±60 phút): ${news}`,
+            `- Nguồn giá: ${asset.sourceName || '—'}`,
+            '',
+            'Hãy phân tích: 1) Luận điểm vào lệnh có vững không, 2) Rủi ro lớn nhất,',
+            '3) Khi nào nên bỏ/hủy kế hoạch, 4) Gợi ý quản lý lệnh (dời BE/chốt từng phần).',
+            'Ngắn gọn, tiếng Việt.',
+          ].join('\n');
+        }}
+      />
+
+      <div>
           <button
             onClick={fireOneClick}
             disabled={!!planError}
