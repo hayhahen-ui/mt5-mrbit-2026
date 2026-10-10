@@ -3,6 +3,7 @@ import { MarketContextState, Asset } from '../../types';
 import { Activity, BarChart2, Compass, Layers } from 'lucide-react';
 import { SentimentPanel } from '../SentimentPanel';
 import { ForexJournalPanel } from '../ForexJournalPanel';
+import { PatternsPanel } from '../PatternsPanel';
 
 interface CtxTabProps {
   marketContext: MarketContextState;
@@ -98,6 +99,9 @@ export const CtxTab: React.FC<CtxTabProps> = ({ marketContext, asset }) => {
 
       {/* 4. Nhật ký dữ liệu forex — heatmap đa khung + snapshot 15 phút */}
       <ForexJournalPanel />
+
+      {/* 5. Mẫu hình nến đa chiều — từ nến 5m thật (TwelveData) */}
+      <PatternsPanel />
     </div>
   );
 };

@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Asset, Signal, NewsEvent, MarketSnapshot, DataSource } from '../types';
 import { INITIAL_ASSETS } from '../data/mockData';
 import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
+import { Quote } from '../types';
+import { getTdKey, tdCandles, TD_LIST, tdHasQuota, sleep, TD_GAP_MS } from '../lib/twelvedata';
+import { mergeTdCandles } from '../lib/tdStore';
+import { recordPricePoints } from '../lib/priceHistory';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
 import { observeCandidate } from '../lib/neural/observer';
@@ -42,6 +46,44 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
   });
 
   const historyRef = useRef(new PriceHistory());
+  /** Giá forex mới nhất từ TwelveData { sym: { price, at } } */
+  const tdRef = useRef<Record<string, { price: number; at: number }>>({});
+  /** Ghi đè quote forex bằng giá TwelveData nếu còn tươi (<45'). */
+  const tdOverride = (quotes: Record<string, Quote>): Record<string, Quote> => {
+    const now = Date.now();
+    for (const sym of TD_LIST) {
+      const q = tdRef.current[sym];
+      if (q && now - q.at < 45 * 60_000) {
+        quotes[sym] = {
+          symbol: sym, price: q.price, change24h: 0,
+          source: 'LIVE' as const, sourceName: 'TwelveData', updatedAt: now,
+        };
+      }
+    }
+    return quotes;
+  };
+  /** 1 chu kỳ TwelveData: nến 5m → kho masterdata → seed engine → heatmap → quotes. */
+  const runTdCycle = useCallback(async (): Promise<boolean> => {
+    if (!getTdKey() || !tdHasQuota(TD_LIST.length)) return false;
+    let ok = false;
+    for (let i = 0; i < TD_LIST.length; i++) {
+      const sym = TD_LIST[i];
+      try {
+        const candles = await tdCandles(sym, 96);
+        if (candles.length >= 5) {
+          mergeTdCandles(sym, candles);
+          recordPricePoints(sym, candles.map((c) => ({ t: c.t, p: c.c })));
+          const closes = candles.map((c) => c.c);
+          historyRef.current.seed(sym, closes);
+          const last = candles[candles.length - 1];
+          tdRef.current[sym] = { price: last.c, at: Date.now() };
+          ok = true;
+        }
+      } catch { /* mã lỗi thì giữ dữ liệu cũ */ }
+      if (i < TD_LIST.length - 1) await sleep(TD_GAP_MS); // tôn trọng 8 credit/phút
+    }
+    return ok;
+  }, []);
   const dayOpenRef = useRef<Record<string, { day: string; open: number }>>({});
   const equityRef = useRef(equity);
   const riskRef = useRef(riskPct);
@@ -171,15 +213,18 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const tdPromise = runTdCycle();
       const [btcHist, ethHist, news] = await Promise.all([
         fetchKrakenHistory('XBTUSD', 60),
         fetchKrakenHistory('ETHUSD', 60),
         fetchEconomicCalendar(),
       ]);
       if (cancelled) return;
-      // Seed warmup engine từ kho giá localStorage (không mất 20 mẫu sau mỗi F5)
+      await tdPromise; // nến 5m thật ưu tiên seed engine trước
+      // Seed warmup engine từ kho giá localStorage — chỉ lấp mã chưa có nến TwelveData
       try {
         for (const sym of HEATMAP_SYMBOLS) {
+          if (historyRef.current.get(sym).length >= 20) continue;
           const closes = seedCloses(sym, 120);
           if (closes.length >= 5) historyRef.current.seed(sym, closes);
         }
@@ -187,7 +232,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       if (btcHist.length) historyRef.current.seed('BTCUSD', btcHist);
       if (ethHist.length) historyRef.current.seed('ETHUSD', ethHist);
       setState((prev) => ({ ...prev, news, newsSource: getNewsSourceName() }));
-      const quotes = await fetchAllQuotes();
+      const quotes = tdOverride(await fetchAllQuotes());
       if (cancelled) return;
       const freshNews = await fetchEconomicCalendar();
       applyQuotes(quotes, freshNews);
@@ -199,7 +244,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
   useEffect(() => {
     let forexTimer = 0;
     const tickFast = async () => {
-      const quotes = await fetchAllQuotes();
+      const quotes = tdOverride(await fetchAllQuotes());
       const news = await fetchEconomicCalendar();
       setState((prev) => ({ ...prev, news, newsSource: getNewsSourceName() }));
       applyQuotes(quotes, news);
@@ -207,10 +252,20 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
     const fastId = window.setInterval(tickFast, CRYPTO_POLL_MS);
     // Forex trong fetchAllQuotes đã gộp; tách nhịp riêng để đỡ tải:
     forexTimer = window.setInterval(async () => {
-      const quotes = await fetchAllQuotes();
+      const quotes = tdOverride(await fetchAllQuotes());
       const news = await fetchEconomicCalendar();
       applyQuotes(quotes, news);
     }, FOREX_POLL_MS);
+    // TwelveData: làm mới nến 5m mỗi 20 phút (~650 credit/ngày, trong hạn 800)
+    const tdId = window.setInterval(async () => {
+      const ok = await runTdCycle();
+      if (ok) {
+        const quotes = tdOverride(await fetchAllQuotes());
+        const news = await fetchEconomicCalendar();
+        setState((prev) => ({ ...prev, news, newsSource: getNewsSourceName() }));
+        applyQuotes(quotes, news);
+      }
+    }, 20 * 60_000);
     const newsId = window.setInterval(async () => {
       const news = await fetchEconomicCalendar();
       setState((prev) => ({ ...prev, news, newsSource: getNewsSourceName() }));
@@ -219,6 +274,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       window.clearInterval(fastId);
       window.clearInterval(forexTimer);
       window.clearInterval(newsId);
+      window.clearInterval(tdId);
     };
   }, [applyQuotes]);
 

@@ -65,6 +65,30 @@ export function priceHistorySize(): number {
   try { return (localStorage.getItem(KEY) || '').length * 2; } catch { return 0; }
 }
 
+/** Merge điểm giá có timestamp (từ nến TwelveData) vào kho — dedupe theo t. */
+export function recordPricePoints(symbol: string, points: { t: number; p: number }[]): void {
+  if (!points || points.length === 0) return;
+  const h = read();
+  const arr = h[symbol] || [];
+  const seen = new Set(arr.map((x) => x.t));
+  let changed = false;
+  for (const pt of points) {
+    if (!Number.isFinite(pt.p) || pt.p <= 0 || !Number.isFinite(pt.t) || pt.t <= 0) continue;
+    if (seen.has(pt.t)) continue;
+    arr.push({ t: pt.t, p: pt.p });
+    seen.add(pt.t);
+    changed = true;
+  }
+  if (!changed) return;
+  arr.sort((a, b) => a.t - b.t);
+  const now = Date.now();
+  const cutoff = now - KEEP_MS;
+  while (arr.length > 0 && arr[0].t < cutoff) arr.shift();
+  while (arr.length > MAX_POINTS) arr.shift();
+  h[symbol] = arr;
+  write(h);
+}
+
 /** Lấy n giá đóng gần nhất của 1 mã (để seed engine warmup sau F5). */
 export function seedCloses(symbol: string, n = 120): number[] {
   const arr = read()[symbol] || [];
