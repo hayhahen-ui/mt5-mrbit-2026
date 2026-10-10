@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Users, RefreshCw, AlertTriangle } from 'lucide-react';
 import { getOutlook, findSentiment, sentimentBias, getMfCred, SentimentRow } from '../lib/sentiment';
-
-const TRACKED = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY'];
+import { HEATMAP_SYMBOLS as TRACKED } from '../lib/priceHistory';
 
 /** Panel tâm lý đám đông — MyFxBook Community Outlook (cần tài khoản user). */
 export const SentimentPanel: React.FC<{ compact?: boolean }> = ({ compact = false }) => {

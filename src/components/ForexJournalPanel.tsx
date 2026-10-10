@@ -81,7 +81,7 @@ export const ForexJournalPanel: React.FC = () => {
         Heatmap % thay đổi giá đa khung, tự tính từ giá thật app thu thập (thay cho MyFxBook heat-map).
         Snapshot 15 phút/lần: giá + heatmap + tâm lý MyFxBook + số tin HIGH — lưu append-only, không tự xóa.
         <span className="font-mono text-slate-500">
-          {' '}· điểm giá đã ghi: {HEATMAP_SYMBOLS.map((x) => `${x.replace('USD','')}:${counts[x] ?? 0}`).join(' ')}
+          {' '}· điểm giá đã ghi: {HEATMAP_SYMBOLS.map((x) => `${x}:${counts[x] ?? 0}`).join(' ')}
         </span>
       </div>
 

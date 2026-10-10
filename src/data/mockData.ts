@@ -39,6 +39,12 @@ export const INITIAL_ASSETS: Asset[] = [
   { symbol: 'BTCUSD', name: 'Bitcoin / US Dollar', category: 'Crypto', price: 67450.00, change24h: 3.80, spread: 12.0, trendH1: 'BULL', signalDir: 'BUY', quality: 'Q5', digits: 2 },
   { symbol: 'ETHUSD', name: 'Ethereum / US Dollar', category: 'Crypto', price: 2680.50, change24h: 2.10, spread: 2.5, trendH1: 'BULL', signalDir: 'FLAT', quality: 'Q3', digits: 2 },
   { symbol: 'AUDUSD', name: 'Aussie / US Dollar', category: 'Forex', price: 0.6580, change24h: -0.15, spread: 0.9, trendH1: 'FLAT', signalDir: 'FLAT', quality: 'Q2', digits: 5 },
+  { symbol: 'NZDUSD', name: 'Kiwi / US Dollar', category: 'Forex', price: 0.5980, change24h: 0.10, spread: 1.0, trendH1: 'FLAT', signalDir: 'FLAT', quality: 'Q2', digits: 5 },
+  { symbol: 'USDCAD', name: 'US Dollar / Canadian', category: 'Forex', price: 1.3850, change24h: 0.20, spread: 1.2, trendH1: 'FLAT', signalDir: 'FLAT', quality: 'Q2', digits: 5 },
+  { symbol: 'USDCHF', name: 'US Dollar / Swiss Franc', category: 'Forex', price: 0.8950, change24h: -0.10, spread: 1.1, trendH1: 'FLAT', signalDir: 'FLAT', quality: 'Q2', digits: 5 },
+  { symbol: 'EURJPY', name: 'Euro / Yen', category: 'Forex', price: 171.50, change24h: 0.30, spread: 1.3, trendH1: 'FLAT', signalDir: 'FLAT', quality: 'Q2', digits: 3 },
+  { symbol: 'GBPJPY', name: 'Pound / Yen', category: 'Forex', price: 199.80, change24h: 0.40, spread: 1.5, trendH1: 'FLAT', signalDir: 'FLAT', quality: 'Q2', digits: 3 },
+  { symbol: 'EURGBP', name: 'Euro / Pound', category: 'Forex', price: 0.8450, change24h: -0.05, spread: 0.9, trendH1: 'FLAT', signalDir: 'FLAT', quality: 'Q2', digits: 5 },
   { symbol: 'US30', name: 'Dow Jones Industrial', category: 'Indices', price: 42800.00, change24h: 0.65, spread: 3.0, trendH1: 'BULL', signalDir: 'BUY', quality: 'Q4', digits: 1 }
 ];
 

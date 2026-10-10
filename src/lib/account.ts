@@ -11,7 +11,7 @@ const KEY = 'nexuspilot-account-v1';
 export const CAPITAL_PRESETS = [1000, 10000, 50000, 100000];
 export const DEFAULT_CAPITAL = 100000;
 
-const FOREX = new Set(['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD']);
+const FOREX = new Set(['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF', 'EURJPY', 'GBPJPY', 'EURGBP']);
 
 export function isForexSymbol(symbol: string): boolean {
   return FOREX.has(symbol);

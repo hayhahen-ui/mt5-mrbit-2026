@@ -33,6 +33,12 @@ export const FF_MARKET_SLUGS: Record<string, string> = {
   AUDUSD: 'audusd',
   BTCUSD: 'btcusd',
   ETHUSD: 'ethusd',
+  NZDUSD: 'nzdusd',
+  USDCAD: 'usdcad',
+  USDCHF: 'usdchf',
+  EURJPY: 'eurjpy',
+  GBPJPY: 'gbpjpy',
+  EURGBP: 'eurgbp',
 };
 
 export function ffMarketUrl(symbol: string): string | null {

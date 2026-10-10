@@ -12,7 +12,7 @@ const MAX_POINTS = 1500;            // trần an toàn/mã
 interface Pt { t: number; p: number }
 type Hist = Record<string, Pt[]>;
 
-export const HEATMAP_SYMBOLS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY'];
+export const HEATMAP_SYMBOLS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURJPY', 'GBPJPY'];
 export const HEATMAP_TFS = [5, 15, 60, 240, 1440]; // phút
 export const HEATMAP_TF_LABELS: Record<number, string> = { 5: '5m', 15: '15m', 60: '1h', 240: '4h', 1440: '24h' };
 

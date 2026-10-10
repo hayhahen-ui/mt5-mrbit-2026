@@ -106,12 +106,19 @@ export async function fetchForexQuotes(): Promise<Quote[]> {
       sourceName: 'ER-API',
       updatedAt: now(),
     });
+    const jpy = (s: string) => s.endsWith('JPY');
     return [
       q('EURUSD', 1 / r.EUR),
       q('GBPUSD', 1 / r.GBP),
       q('USDJPY', r.JPY),
       q('AUDUSD', 1 / r.AUD),
-    ].map((x) => ({ ...x, price: Number(x.price.toFixed(x.symbol === 'USDJPY' ? 3 : 5)) }));
+      q('NZDUSD', 1 / r.NZD),
+      q('USDCAD', r.CAD),
+      q('USDCHF', r.CHF),
+      q('EURJPY', r.JPY / r.EUR),
+      q('GBPJPY', r.JPY / r.GBP),
+      q('EURGBP', r.GBP / r.EUR),
+    ].map((x) => ({ ...x, price: Number(x.price.toFixed(jpy(x.symbol) ? 3 : 5)) }));
   } catch (e) {
     markHealth('erapi', false, null, e instanceof Error ? e.message : 'fetch failed');
     return [];
