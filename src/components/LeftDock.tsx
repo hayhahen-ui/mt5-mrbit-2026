@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AccountState, MarketContextState, Asset } from '../types';
 import { ShieldCheck, ShieldAlert, Clock, Calculator, Send, AlertTriangle, X } from 'lucide-react';
+import { evalSessions } from '../lib/sessions';
 
 interface LeftDockProps {
   isOpen: boolean;
@@ -102,37 +103,30 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         </div>
       </div>
 
-      {/* 2. Sessions & Candle Timer */}
+      {/* 2. Sessions & Candle Timer — trạng thái thật theo múi giờ sàn */}
       <div className="glass-panel p-3.5 space-y-2.5">
         <div className="flex items-center justify-between text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <Clock size={13} />
             PHIÊN GIAO DỊCH
           </span>
-          <span className="text-[10px] font-mono text-sky-400">GMT+2</span>
+          <span className="text-[10px] font-mono text-sky-400">giờ sàn thật</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-          <div className={`p-1.5 rounded text-center border ${
-            marketContext.sessions.sydney ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 font-bold' : 'bg-[#0b0f19] border-[#1e2b48] text-slate-400'
-          }`}>
-            SYDNEY {marketContext.sessions.sydney ? '●' : '○'}
-          </div>
-          <div className={`p-1.5 rounded text-center border ${
-            marketContext.sessions.tokyo ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 font-bold' : 'bg-[#0b0f19] border-[#1e2b48] text-slate-400'
-          }`}>
-            TOKYO {marketContext.sessions.tokyo ? '●' : '○'}
-          </div>
-          <div className={`p-1.5 rounded text-center border ${
-            marketContext.sessions.london ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 font-bold' : 'bg-[#0b0f19] border-[#1e2b48] text-slate-400'
-          }`}>
-            LONDON {marketContext.sessions.london ? '●' : '○'}
-          </div>
-          <div className={`p-1.5 rounded text-center border ${
-            marketContext.sessions.newYork ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 font-bold' : 'bg-[#0b0f19] border-[#1e2b48] text-slate-400'
-          }`}>
-            NEW YORK {marketContext.sessions.newYork ? '●' : '○'}
-          </div>
+          {evalSessions(new Date()).map((s) => (
+            <div
+              key={s.id}
+              className={`p-1.5 rounded text-center border ${
+                s.isOpen
+                  ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 font-bold'
+                  : 'bg-[#0b0f19] border-[#1e2b48] text-slate-400'
+              }`}
+              title={`${s.label} ${s.time} — ${s.nextLabel} ${Math.floor(s.minsToNext / 60)}h${String(Math.floor(s.minsToNext % 60)).padStart(2, '0')}p`}
+            >
+              {s.label.toUpperCase()} {s.isOpen ? '●' : '○'}
+            </div>
+          ))}
         </div>
 
         <div className="flex items-center justify-between bg-[#0b0f19] p-2 rounded border border-[#1e2b48] text-xs">

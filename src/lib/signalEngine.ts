@@ -5,6 +5,7 @@ import { getVerdict, checkNewsFilter, totalScore } from './scoring';
 import { appendKaizen } from './kaizen';
 import { newsNearSymbol } from './news';
 import { RawFeatureInputs } from './neural/features';
+import { evalSessions } from './sessions';
 
 /**
  * Signal Engine chạy trên DỮ LIỆU THẬT:
@@ -63,14 +64,11 @@ export function rsi(values: number[], period = 14): number {
   return 100 - 100 / (1 + rs);
 }
 
-/** Phiên đang mở theo giờ UTC thật */
+/** Phiên đang mở theo múi giờ chuẩn của sàn (đồng bộ với thanh đồng hồ) */
 export function currentSession(): string {
-  const h = new Date().getUTCHours();
-  const open: string[] = [];
-  if (h >= 21 || h < 6) open.push('Sydney');
-  if (h >= 0 && h < 9) open.push('Tokyo');
-  if (h >= 7 && h < 16) open.push('London');
-  if (h >= 12 && h < 21) open.push('New York');
+  const open = evalSessions(new Date())
+    .filter((s) => s.isOpen)
+    .map((s) => s.label);
   return open.length ? open.join('+') : 'Nghỉ phiên';
 }
 

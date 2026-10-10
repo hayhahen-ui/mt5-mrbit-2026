@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
+import { evalSessions, partsInTz, fmtClock, fmtDur } from '../lib/sessions';
 
 /**
  * Thanh đồng hồ giao dịch realtime:
@@ -7,78 +8,6 @@ import { Clock } from 'lucide-react';
  * - Giờ các phiên Á/Âu/Mỹ theo múi giờ chuẩn của sàn (Intl API)
  * - Trạng thái mở/đóng cửa + đếm ngược tới lần mở/đóng tiếp theo
  */
-
-interface SessionDef {
-  id: string;
-  label: string;
-  flag: string;
-  tz: string;
-  openHour: number;
-  closeHour: number;
-}
-
-const SESSIONS: SessionDef[] = [
-  { id: 'sydney', label: 'Sydney', flag: '🇦🇺', tz: 'Australia/Sydney', openHour: 9, closeHour: 17 },
-  { id: 'tokyo', label: 'Tokyo · Á', flag: '🇯🇵', tz: 'Asia/Tokyo', openHour: 9, closeHour: 18 },
-  { id: 'london', label: 'London · Âu', flag: '🇬🇧', tz: 'Europe/London', openHour: 8, closeHour: 17 },
-  { id: 'newyork', label: 'New York · Mỹ', flag: '🇺🇸', tz: 'America/New_York', openHour: 8, closeHour: 17 },
-];
-
-function partsInTz(tz: string, d: Date): { h: number; m: number; s: number } {
-  const fmt = new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hourCycle: 'h23', timeZone: tz,
-  });
-  const parts = fmt.formatToParts(d);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value || 0);
-  return { h: get('hour'), m: get('minute'), s: get('second') };
-}
-
-function fmtTime(p: { h: number; m: number; s: number }): string {
-  const z = (n: number) => String(n).padStart(2, '0');
-  return `${z(p.h)}:${z(p.m)}:${z(p.s)}`;
-}
-
-function fmtDur(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = Math.floor(mins % 60);
-  return h > 0 ? `${h}h${String(m).padStart(2, '0')}p` : `${m}p`;
-}
-
-interface SessionState extends SessionDef {
-  time: string;
-  isOpen: boolean;
-  countdown: string;
-  countdownLabel: string;
-}
-
-function evalSession(def: SessionDef, now: Date): SessionState {
-  const p = partsInTz(def.tz, now);
-  const minsNow = p.h * 60 + p.m + p.s / 60;
-  const openM = def.openHour * 60;
-  const closeM = def.closeHour * 60;
-  const isOpen = minsNow >= openM && minsNow < closeM;
-  let targetM: number;
-  let label: string;
-  if (isOpen) {
-    targetM = closeM;
-    label = 'đóng sau';
-  } else if (minsNow < openM) {
-    targetM = openM;
-    label = 'mở sau';
-  } else {
-    targetM = openM + 24 * 60; // qua ngày mai
-    label = 'mở sau';
-  }
-  return {
-    ...def,
-    time: fmtTime(p),
-    isOpen,
-    countdown: fmtDur(targetM - minsNow),
-    countdownLabel: label,
-  };
-}
-
 export const SessionClocks: React.FC = () => {
   const [now, setNow] = useState(() => new Date());
 
@@ -87,9 +16,9 @@ export const SessionClocks: React.FC = () => {
     return () => window.clearInterval(id);
   }, []);
 
-  const local = fmtTime(partsInTz(Intl.DateTimeFormat().resolvedOptions().timeZone, now));
-  const utc = fmtTime(partsInTz('UTC', now));
-  const sessions = SESSIONS.map((s) => evalSession(s, now));
+  const local = fmtClock(partsInTz(Intl.DateTimeFormat().resolvedOptions().timeZone, now));
+  const utc = fmtClock(partsInTz('UTC', now));
+  const sessions = evalSessions(now);
   const anyOpen = sessions.some((s) => s.isOpen);
 
   return (
@@ -110,7 +39,7 @@ export const SessionClocks: React.FC = () => {
       {/* Các phiên */}
       <div className="flex items-center gap-3 shrink-0">
         {sessions.map((s) => (
-          <div key={s.id} className="flex items-center gap-1.5 font-mono" title={`${s.label}: ${s.countdownLabel} ${s.countdown}`}>
+          <div key={s.id} className="flex items-center gap-1.5 font-mono" title={`${s.label}: ${s.nextLabel} ${fmtDur(s.minsToNext)}`}>
             <span className={`w-2 h-2 rounded-full ${s.isOpen ? 'bg-emerald-400 radar-pulse' : 'bg-slate-600'}`} />
             <span className="text-slate-400">{s.flag} {s.label}:</span>
             <strong className={s.isOpen ? 'text-emerald-300' : 'text-slate-300'}>{s.time}</strong>
