@@ -104,3 +104,25 @@ export async function tdPrice(symbol: string): Promise<number> {
 /** Delay giữa các call để không vượt 8 credit/phút. */
 export const TD_GAP_MS = 8000;
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Lỗi lần cuối theo từng mã (để UI hiện rõ lý do thiếu nến). */
+const TD_ERR_KEY = 'nexuspilot-td-errors-v1';
+export function recordTdError(sym: string, msg: string) {
+  try {
+    const all = getTdErrors();
+    all[sym] = { msg: String(msg).slice(0, 160), at: Date.now() };
+    localStorage.setItem(TD_ERR_KEY, JSON.stringify(all));
+  } catch { /* noop */ }
+}
+export function clearTdError(sym: string) {
+  try {
+    const all = getTdErrors();
+    if (all[sym]) { delete all[sym]; localStorage.setItem(TD_ERR_KEY, JSON.stringify(all)); }
+  } catch { /* noop */ }
+}
+export function getTdErrors(): Record<string, { msg: string; at: number }> {
+  try {
+    const raw = localStorage.getItem(TD_ERR_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}

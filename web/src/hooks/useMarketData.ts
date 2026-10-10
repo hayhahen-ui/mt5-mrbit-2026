@@ -3,7 +3,7 @@ import { Asset, Signal, NewsEvent, MarketSnapshot, DataSource } from '../types';
 import { INITIAL_ASSETS } from '../data/mockData';
 import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
 import { Quote } from '../types';
-import { getTdKey, tdCandles, TD_LIST, TD_QUOTE_LIST, tdHasQuota, sleep, TD_GAP_MS } from '../lib/twelvedata';
+import { getTdKey, tdCandles, TD_LIST, TD_QUOTE_LIST, tdHasQuota, sleep, TD_GAP_MS, recordTdError, clearTdError } from '../lib/twelvedata';
 import { mergeTdCandles } from '../lib/tdStore';
 import { getGhPat, ghAutoSync, ghSyncNow } from '../lib/ghSync';
 import { recordPricePoints } from '../lib/priceHistory';
@@ -78,11 +78,15 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
           historyRef.current.seed(sym, closes);
           const last = candles[candles.length - 1];
           tdRef.current[sym] = { price: last.c, at: Date.now() };
+          clearTdError(sym);
           ok = true;
         }
-      } catch { /* mã lỗi thì giữ dữ liệu cũ */ }
+      } catch (e) {
+        recordTdError(sym, e instanceof Error ? e.message : 'lỗi không rõ');
+      }
       if (i < TD_LIST.length - 1) await sleep(TD_GAP_MS); // tôn trọng 8 credit/phút
     }
+    try { window.dispatchEvent(new CustomEvent('td-updated')); } catch { /* noop */ }
     return ok;
   }, []);
   const dayOpenRef = useRef<Record<string, { day: string; open: number }>>({});
@@ -257,6 +261,8 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       const news = await fetchEconomicCalendar();
       applyQuotes(quotes, news);
     }, FOREX_POLL_MS);
+    const tdManual = () => { runTdCycle(); };
+    window.addEventListener('td-refresh-now', tdManual);
     // TwelveData: làm mới nến 5m mỗi 30 phút (~530 credit/ngày cho 11 mã, trong hạn 800)
     // GitHub auto-sync masterdata mỗi 15 phút (chỉ khi user bật + có PAT)
     const ghId = window.setInterval(async () => {
@@ -283,6 +289,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       window.clearInterval(newsId);
       window.clearInterval(tdId);
       window.clearInterval(ghId);
+      window.removeEventListener('td-refresh-now', tdManual);
     };
   }, [applyQuotes]);
 
