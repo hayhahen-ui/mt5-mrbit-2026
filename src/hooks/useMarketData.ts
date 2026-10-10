@@ -163,10 +163,12 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
               const open = dayOpenRef.current[a.symbol].open;
               change24h = open > 0 ? Number((((price - open) / open) * 100).toFixed(2)) : 0;
             }
+            // Chỉ quote live vượt lưới lọc mới được làm mốc cho guard —
+            // giá mock/OFFLINE không bao giờ thành baseline.
+            if (price > 0) lastPriceRef.current[a.symbol] = price;
             history.push(a.symbol, price);
           }
 
-          if (price > 0) lastPriceRef.current[a.symbol] = price;
           return { ...a, price, change24h, dataSource: source, sourceName, updatedAt, warmup: history.warmup(a.symbol) };
         });
 

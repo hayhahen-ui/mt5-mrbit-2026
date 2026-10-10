@@ -175,6 +175,11 @@ export const App: React.FC = () => {
       prev.map((p) => {
         const curAsset = assets.find((a) => a.symbol === p.symbol);
         if (!curAsset) return p;
+        // GIÁ MOCK/OFFLINE KHÔNG ĐƯỢC TÍNH P&L (bug 10/10: giá mock XAUUSD 2652.40
+        // làm P&L/Equity ảo +$462.96). Chỉ tính khi đã có quote live tươi (<15 phút),
+        // nếu không thì đóng băng P&L cũ, không tính bằng giá mock.
+        const fresh = curAsset.dataSource !== 'OFFLINE' && !!curAsset.updatedAt && Date.now() - curAsset.updatedAt < 15 * 60_000;
+        if (!fresh) return p;
         const diff = p.type === 'BUY' ? curAsset.price - p.entryPrice : p.entryPrice - curAsset.price;
         const pips = diff / (curAsset.category === 'Forex' ? 0.0001 : 0.1);
         const pnl = pips * p.lot * (curAsset.category === 'Forex' ? 10 : 1);
