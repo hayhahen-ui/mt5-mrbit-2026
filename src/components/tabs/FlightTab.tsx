@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Signal, Asset, Position, JournalEntry, JournalOutcome, MarketSnapshot } from '../../types';
-import { TrendingUp, TrendingDown, Target, Shield, Zap, CheckCircle2, ChevronRight, X, AlertTriangle, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Shield, Zap, CheckCircle2, ChevronRight, X, AlertTriangle, BarChart3, RotateCcw, PencilLine } from 'lucide-react';
 import { totalScore, maxScore, getVerdict, VERDICT_META, NewsFilterResult } from '../../lib/scoring';
+import { usdPerPipPerLot, pipSizeOf, fmtUsd } from '../../lib/account';
 import { NeuralPanel } from '../NeuralPanel';
 
 interface FlightTabProps {
@@ -54,6 +55,67 @@ export const FlightTab: React.FC<FlightTabProps> = ({
   const scoreMax = maxScore(signal.scoreBreakdown);
   const verdict = signal.verdict || getVerdict(score);
   const verdictMeta = VERDICT_META[verdict];
+
+  /* ── KẾ HOẠCH LỆNH CHỈNH TAY ─────────────────────────────
+     Mặc định lấy từ engine; user sửa trực tiếp trên ô giá trị.
+     Reset khi đổi mã, hoặc bấm nút ↺. 1-Click dùng đúng số đang hiện. */
+  const planDefaults = () => ({
+    lot: String(signal.suggestedLot),
+    sl: String(signal.stopLoss),
+    tp1: String(signal.tp1),
+    tp2: String(signal.tp2),
+    tp3: String(signal.tp3),
+  });
+  const [planSym, setPlanSym] = useState(signal.symbol);
+  const [plan, setPlan] = useState(planDefaults);
+  if (planSym !== signal.symbol) {
+    setPlanSym(signal.symbol);
+    setPlan(planDefaults());
+  }
+  const setPlanField = (k: keyof typeof plan, v: string) =>
+    setPlan((p) => ({ ...p, [k]: v }));
+
+  const pipSize = pipSizeOf(asset.symbol);
+  const usdPip = usdPerPipPerLot(asset.symbol);
+  const entry = signal.entryPrice;
+  const planLot = Math.max(0.01, parseFloat(plan.lot) || 0);
+  const planSL = parseFloat(plan.sl);
+  const planTP = [parseFloat(plan.tp1), parseFloat(plan.tp2), parseFloat(plan.tp3)];
+  // Chia lot đúng công thức App.handleExecuteTrade: 50% / 30% / phần còn lại
+  const lot1 = Number((planLot * 0.5).toFixed(2));
+  const lot2 = Number((planLot * 0.3).toFixed(2));
+  const lot3 = Number((planLot - lot1 - lot2).toFixed(2));
+  const tierLots = [lot1, lot2, lot3];
+  const usdFor = (px: number, lotT: number) =>
+    !isFinite(px) || !isFinite(lotT) ? 0
+      : Number(((Math.abs(px - entry) / pipSize) * lotT * usdPip).toFixed(2));
+
+  // Kiểm tra hợp lệ theo chiều lệnh
+  const validNum = (n: number) => isFinite(n) && n > 0;
+  const planError = !validNum(planLot)
+    ? 'Lot phải > 0'
+    : !validNum(planSL) || planTP.some((t) => !validNum(t))
+      ? 'Giá SL/TP chưa hợp lệ'
+      : isBuy
+        ? (planSL >= entry ? 'SL phải nằm DƯỚI giá vào (lệnh BUY)' : null) ||
+          (planTP[0] <= entry ? 'TP1 phải nằm TRÊN giá vào (lệnh BUY)' : null) ||
+          (planTP[1] < planTP[0] ? 'TP2 phải ≥ TP1' : null) ||
+          (planTP[2] < planTP[1] ? 'TP3 phải ≥ TP2' : null)
+        : (planSL <= entry ? 'SL phải nằm TRÊN giá vào (lệnh SELL)' : null) ||
+          (planTP[0] >= entry ? 'TP1 phải nằm DƯỚI giá vào (lệnh SELL)' : null) ||
+          (planTP[1] > planTP[0] ? 'TP2 phải ≤ TP1' : null) ||
+          (planTP[2] > planTP[1] ? 'TP3 phải ≤ TP2' : null);
+
+  const totalRiskUsd = usdFor(planSL, planLot);
+  const totalWinUsd = planTP.reduce((a, tp, i) => a + usdFor(tp, tierLots[i]), 0);
+
+  const fireOneClick = () => {
+    if (planError) return;
+    onExecuteTrade(
+      { ...signal, stopLoss: planSL, tp1: planTP[0], tp2: planTP[1], tp3: planTP[2] },
+      planLot
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -240,53 +302,86 @@ export const FlightTab: React.FC<FlightTabProps> = ({
         {/* 2c. NEURAL SHADOW (skill Mr.Bit P0) */}
         <NeuralPanel signal={signal} snapshot={snapshot} refreshKey={dataTick} />
 
-        {/* Price Levels Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs font-mono">
-          <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-[#1e2b48]">
-            <div className="text-[10px] text-slate-400">ENTRY PRICE</div>
-            <div className="text-sm font-bold text-slate-100">{signal.entryPrice.toFixed(asset.digits)}</div>
-          </div>
-          <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-rose-900/50">
-            <div className="text-[10px] text-rose-400 flex items-center justify-between">
-              <span>STOP LOSS</span>
-              <span>-{signal.pipsSL} p</span>
+        {/* KẾ HOẠCH LỆNH — CHỈNH TAY TRƯỚC KHI BẤM 1-CLICK */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+              <PencilLine size={12} className="text-sky-400" />
+              KẾ HOẠCH LỆNH — SỬA TRỰC TIẾP TRÊN Ô GIÁ TRỊ
             </div>
-            <div className="text-sm font-bold text-rose-400">{signal.stopLoss.toFixed(asset.digits)}</div>
+            <button
+              onClick={() => setPlan(planDefaults())}
+              className="text-[10px] font-bold text-slate-400 hover:text-sky-300 flex items-center gap-1 border border-[#243356] rounded-lg px-2 py-1"
+              title="Trả về giá trị engine đề xuất"
+            >
+              <RotateCcw size={10} /> Về giá trị engine
+            </button>
           </div>
-          <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-emerald-900/50">
-            <div className="text-[10px] text-emerald-400 flex items-center justify-between">
-              <span>TP1 (82% Odds)</span>
-              <span>+{signal.pipsTP1} p</span>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 text-xs font-mono">
+            <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-[#1e2b48]">
+              <div className="text-[10px] text-slate-400">ENTRY PRICE</div>
+              <div className="text-sm font-bold text-slate-100">{entry.toFixed(asset.digits)}</div>
+              <div className="text-[10px] text-slate-500 mt-1">giá thị trường lúc bấm</div>
             </div>
-            <div className="text-sm font-bold text-emerald-400">{signal.tp1.toFixed(asset.digits)}</div>
-          </div>
-          <div className="bg-[#0b0f19] p-2.5 rounded-lg border border-emerald-900/50">
-            <div className="text-[10px] text-emerald-400 flex items-center justify-between">
-              <span>TP2 (56% Odds)</span>
-              <span>+{signal.pipsTP2} p</span>
-            </div>
-            <div className="text-sm font-bold text-emerald-400">{signal.tp2.toFixed(asset.digits)}</div>
+            {([
+              { k: 'sl', label: 'STOP LOSS', cls: 'border-rose-900/50', tcls: 'text-rose-400', note: `Rủi ro: -${fmtUsd(totalRiskUsd)}` },
+              { k: 'tp1', label: `TP1 · ${tierLots[0]} lot`, cls: 'border-emerald-900/50', tcls: 'text-emerald-400', note: `Lãi: +${fmtUsd(usdFor(planTP[0], tierLots[0]))}` },
+              { k: 'tp2', label: `TP2 · ${tierLots[1]} lot`, cls: 'border-emerald-900/50', tcls: 'text-emerald-400', note: `Lãi: +${fmtUsd(usdFor(planTP[1], tierLots[1]))}` },
+              { k: 'tp3', label: `TP3 · ${tierLots[2]} lot`, cls: 'border-emerald-900/50', tcls: 'text-emerald-400', note: `Lãi: +${fmtUsd(usdFor(planTP[2], tierLots[2]))}` },
+            ] as const).map((f) => (
+              <div key={f.k} className={`bg-[#0b0f19] p-2.5 rounded-lg border ${f.cls}`}>
+                <div className={`text-[10px] ${f.tcls} font-bold`}>{f.label}</div>
+                <input
+                  value={plan[f.k]}
+                  onChange={(e) => setPlanField(f.k, e.target.value)}
+                  inputMode="decimal"
+                  className={`w-full bg-transparent text-sm font-bold ${f.tcls} focus:outline-none border-b border-transparent focus:border-sky-500`}
+                />
+                <div className="text-[10px] text-slate-400 mt-1">{f.note}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* 1-CLICK ORDER EXECUTION BAR */}
         <div className="bg-[#17223b] p-3 rounded-xl border border-[#243356] flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs">
-            <div className="text-slate-300 font-semibold flex items-center gap-1.5">
-              <span>Khối lượng đề xuất:</span>
-              <span className="font-mono font-bold text-sky-400 text-sm">{signal.suggestedLot} Lot</span>
+          <div className="text-xs space-y-1.5">
+            <div className="text-slate-300 font-semibold flex items-center gap-2">
+              <span>Khối lượng:</span>
+              <input
+                value={plan.lot}
+                onChange={(e) => setPlanField('lot', e.target.value)}
+                inputMode="decimal"
+                className="w-20 bg-[#0b0f19] border border-[#243356] rounded-lg px-2 py-1 font-mono font-bold text-sky-400 text-sm focus:outline-none focus:border-sky-500"
+              />
+              <span className="font-mono">Lot</span>
+              <span className="text-[10px] text-slate-500 font-normal">(engine đề xuất {signal.suggestedLot})</span>
             </div>
             <div className="text-[11px] text-slate-400">
-              Tự động chia 3 lệnh: TP1 (50%), TP2 (30%), TP3 (20%) & Auto Break-Even
+              Tự động chia 3 lệnh: TP1 (50%) · TP2 (30%) · TP3 (20%) · BE bấm tay từng lệnh (nút DỜI BE)
             </div>
+            <div className="text-[11px] font-mono">
+              <span className="text-rose-400 font-bold">Rủi ro tối đa: -{fmtUsd(totalRiskUsd)}</span>
+              <span className="text-slate-500"> (dính SL cả 3)</span>
+              <span className="text-slate-600"> · </span>
+              <span className="text-emerald-400 font-bold">Lãi tối đa: +{fmtUsd(totalWinUsd)}</span>
+              <span className="text-slate-500"> (chạm cả 3 TP)</span>
+            </div>
+            {planError && (
+              <div className="text-[11px] text-amber-400 font-bold">⚠ {planError}</div>
+            )}
           </div>
 
           <button
-            onClick={() => onExecuteTrade(signal, signal.suggestedLot)}
+            onClick={fireOneClick}
+            disabled={!!planError}
             className={`py-3 px-6 rounded-xl font-bold text-sm tracking-wide transition-all shadow-lg flex items-center gap-2 ${
-              isBuy
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/50 hover:scale-[1.02]'
-                : 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-950/50 hover:scale-[1.02]'
+              planError
+                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                : isBuy
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/50 hover:scale-[1.02]'
+                  : 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-950/50 hover:scale-[1.02]'
             }`}
           >
             <Zap size={18} />
