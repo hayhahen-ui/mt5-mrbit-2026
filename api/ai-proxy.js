@@ -96,17 +96,24 @@ async function chatGemini(meta, apiKey, model, messages, maxTokens) {
 }
 
 async function chatOpenAiCompatible(meta, apiKey, model, messages, maxTokens) {
-  const r = await fetchTimeout(`${meta.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages: toOpenAiMessages(messages), max_tokens: maxTokens }),
-  }, CHAT_TIMEOUT_MS);
-  const text = await r.text();
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${text.slice(0, 300)}`);
-  const d = JSON.parse(text);
-  const content = d.choices?.[0]?.message?.content ?? '';
-  if (!content) throw new Error('Provider không trả về nội dung.');
-  return content;
+  // Một số provider (VD: model free của APInex lúc quá tải) thỉnh thoảng trả 200
+  // nhưng nội dung rỗng — glitch thoáng qua, thử lại vài lần trước khi báo lỗi.
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const r = await fetchTimeout(`${meta.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: toOpenAiMessages(messages), max_tokens: maxTokens }),
+    }, CHAT_TIMEOUT_MS);
+    const text = await r.text();
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${text.slice(0, 300)}`);
+    let d;
+    try { d = JSON.parse(text); } catch { d = {}; }
+    const content = d.choices?.[0]?.message?.content ?? '';
+    if (content) return content;
+    if (attempt < maxAttempts) await new Promise((res) => setTimeout(res, 800));
+  }
+  throw new Error('Provider không trả về nội dung (đã thử 3 lần).');
 }
 
 async function chatAnthropic(meta, apiKey, model, messages, maxTokens) {
