@@ -161,23 +161,7 @@ export function evaluateSignal(
     historyReady,
   };
 
-  const snapshot: MarketSnapshot = {
-    price,
-    change24h,
-    atrProxy: Number(atrP.toFixed(3)),
-    roc: Number(rocV.toFixed(3)),
-    session,
-    newsNear: nearNews.slice(0, 3),
-    dataSource,
-    warmup: history.warmup(asset.symbol),
-  };
-
-  if (!historyReady) return { signal: null, snapshot, rawFeatures };
-
-  const direction = price > ema20 && rocV > 0 ? 'BUY' : price < ema20 && rocV < 0 ? 'SELL' : 'FLAT';
-  const engine = pickEngine(rsiV, rocV);
-
-  // --- chấm điểm từng yếu tố trên số liệu THẬT ---
+  // --- chấm điểm từng yếu tố trên số liệu THẬT (tính luôn cả khi warmup để UI xem trước) ---
   const fTrend = Math.min(20, Math.max(0, 10 + Math.abs(rocV) * 12));
   const fMom = Math.min(20, Math.max(0, 10 + Math.abs(rocV) * 10));
   const healthyVol = atrP > 0.02 && atrP < 3.0;
@@ -187,9 +171,10 @@ export function evaluateSignal(
   const fRsi = rsiOk ? 13 : 6;
   const fSpread = spreadOk ? 8 : 4;
   const fNews = newsFilter.blocked ? 0 : 9;
+  const prelimDirection = price > ema20 && rocV > 0 ? 'BUY' : price < ema20 && rocV < 0 ? 'SELL' : 'FLAT';
 
   const factors = [
-    { id: 'xu_huong', label: 'Xu hướng EMA20', points: Math.round(fTrend), maxPoints: 20, passed: fTrend >= 12, detail: `Giá ${price} vs EMA20 ${ema20.toFixed(asset.digits)} — ${direction}` },
+    { id: 'xu_huong', label: 'Xu hướng EMA20', points: Math.round(fTrend), maxPoints: 20, passed: fTrend >= 12, detail: `Giá ${price} vs EMA20 ${ema20.toFixed(asset.digits)} — ${prelimDirection}` },
     { id: 'dong_luong', label: 'Động lượng ROC(10)', points: Math.round(fMom), maxPoints: 20, passed: fMom >= 12, detail: `ROC ${rocV.toFixed(2)}% trên 10 mẫu` },
     { id: 'bien_dong', label: 'Biến động hợp lý', points: fVol, maxPoints: 15, passed: healthyVol, detail: `Độ lệch chuẩn ${atrP.toFixed(3)}% ${healthyVol ? 'trong vùng an toàn' : 'bất thường'}` },
     { id: 'phien', label: 'Phiên giao dịch', points: sess.points, maxPoints: 10, passed: sess.points >= 6, detail: sess.detail },
@@ -197,6 +182,23 @@ export function evaluateSignal(
     { id: 'spread', label: 'Spread trong ngưỡng', points: fSpread, maxPoints: 10, passed: spreadOk, detail: `Spread ${asset.spread} pips` },
     { id: 'tin_tuc', label: 'Lọc tin tức', points: fNews, maxPoints: 10, passed: !newsFilter.blocked, detail: newsFilter.blocked ? newsFilter.reason : 'Không có tin HIGH trong cửa sổ tin' },
   ];
+
+  const snapshot: MarketSnapshot = {
+    price,
+    change24h,
+    atrProxy: Number(atrP.toFixed(3)),
+    roc: Number(rocV.toFixed(3)),
+    session,
+    newsNear: nearNews.slice(0, 3),
+    dataSource,
+    warmup: history.warmup(asset.symbol),
+    pendingFactors: historyReady ? undefined : (factors as any),
+  };
+
+  if (!historyReady) return { signal: null, snapshot, rawFeatures };
+
+  const direction = prelimDirection;
+  const engine = pickEngine(rsiV, rocV);
 
   const score = totalScore(factors as any);
   const verdict = getVerdict(score);

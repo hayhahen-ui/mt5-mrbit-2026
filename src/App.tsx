@@ -423,6 +423,7 @@ export const App: React.FC = () => {
                 <RadarTab
                   assets={assets}
                   signals={signals}
+                  snapshots={snapshots}
                   selectedAsset={selectedAsset}
                   onSelectAsset={(a) => {
                     setSelectedAsset(a);

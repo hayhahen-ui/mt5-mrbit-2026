@@ -75,6 +75,7 @@ export interface MarketSnapshot {
   newsNear: string[];    // tin HIGH trong ±60' (tiêu đề ngắn)
   dataSource: DataSource;
   warmup: string;        // vd '20/20' — số mẫu đã thu thập
+  pendingFactors?: ScoreFactor[]; // 7 tiêu chí tạm tính khi đang warmup (chưa đủ 20 mẫu)
 }
 
 /** Nguồn dữ liệu của một báo giá */

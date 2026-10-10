@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Asset, DataSource, Signal } from '../../types';
+import { Asset, DataSource, Signal, MarketSnapshot } from '../../types';
 import { Radar, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronDown, ScanSearch } from 'lucide-react';
 import { totalScore, maxScore } from '../../lib/scoring';
 
 interface RadarTabProps {
   assets: Asset[];
   signals: Record<string, Signal>;
+  snapshots: Record<string, MarketSnapshot>;
   selectedAsset: Asset;
   onSelectAsset: (asset: Asset) => void;
 }
@@ -33,7 +34,7 @@ function timeAgo(ts?: number): string {
   return `${Math.floor(m / 60)}h trước`;
 }
 
-export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, selectedAsset, onSelectAsset }) => {
+export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, snapshots, selectedAsset, onSelectAsset }) => {
   const [sortKey, setSortKey] = useState<SortKey>('quality');
   const [catFilter, setCatFilter] = useState<CatFilter>('ALL');
   /** Mã đang mở chi tiết quét */
@@ -104,7 +105,8 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, selectedAss
             const warming = (asset.warmup || '0/20') !== '20/20';
             const sig = signals[asset.symbol];
             const isOpen = expanded === asset.symbol;
-            const factors = sig?.scoreBreakdown || [];
+            const pending = !sig && warming ? snapshots[asset.symbol]?.pendingFactors : undefined;
+            const factors = sig?.scoreBreakdown || pending || [];
             const sc = sig ? totalScore(sig.scoreBreakdown) : 0;
             const scMax = sig ? maxScore(sig.scoreBreakdown) : 0;
 
@@ -197,6 +199,11 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, selectedAss
                   >
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-bold text-slate-200">CHI TIẾT QUÉT #{asset.symbol}</span>
+                      {pending && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300">
+                          TẠM TÍNH ({asset.warmup})
+                        </span>
+                      )}
                       {sig && (
                         <span className="font-mono text-slate-400">
                           Điểm <strong className="text-sky-300">{sc}</strong>/{scMax}
