@@ -4,6 +4,7 @@ import {
 import { getVerdict, checkNewsFilter, totalScore } from './scoring';
 import { appendKaizen } from './kaizen';
 import { newsNearSymbol } from './news';
+import { RawFeatureInputs } from './neural/features';
 
 /**
  * Signal Engine chạy trên DỮ LIỆU THẬT:
@@ -142,7 +143,7 @@ export function evaluateSignal(
   input: EngineInput,
   history: PriceHistory,
   logKaizen = true
-): { signal: Signal | null; snapshot: MarketSnapshot } {
+): { signal: Signal | null; snapshot: MarketSnapshot; rawFeatures: RawFeatureInputs } {
   const { asset, price, change24h, dataSource, sourceName, news, equity, riskPct } = input;
   const hist = history.get(asset.symbol);
   const session = currentSession();
@@ -152,6 +153,21 @@ export function evaluateSignal(
   const ema20 = ema(hist, 20);
   const newsFilter = checkNewsFilter(asset.symbol, news);
   const nearNews = newsNearSymbol(asset.symbol, news, SYMBOL_CURRENCIES, 60);
+  const historyReady = history.isReady(asset.symbol);
+  const spreadOk = asset.spread <= (asset.category === 'Crypto' ? 25 : 2.5);
+
+  const rawFeatures: RawFeatureInputs = {
+    price,
+    ema20,
+    roc10: rocV,
+    stdev20: atrP,
+    rsi14: rsiV,
+    session,
+    newsBlocked: newsFilter.blocked,
+    spreadOk,
+    change24h,
+    historyReady,
+  };
 
   const snapshot: MarketSnapshot = {
     price,
@@ -164,7 +180,7 @@ export function evaluateSignal(
     warmup: history.warmup(asset.symbol),
   };
 
-  if (!history.isReady(asset.symbol)) return { signal: null, snapshot };
+  if (!historyReady) return { signal: null, snapshot, rawFeatures };
 
   const direction = price > ema20 && rocV > 0 ? 'BUY' : price < ema20 && rocV < 0 ? 'SELL' : 'FLAT';
   const engine = pickEngine(rsiV, rocV);
@@ -177,7 +193,6 @@ export function evaluateSignal(
   const sess = sessionPoints(session);
   const rsiOk = rsiV >= 30 && rsiV <= 70;
   const fRsi = rsiOk ? 13 : 6;
-  const spreadOk = asset.spread <= (asset.category === 'Crypto' ? 25 : 2.5);
   const fSpread = spreadOk ? 8 : 4;
   const fNews = newsFilter.blocked ? 0 : 9;
 
@@ -262,5 +277,5 @@ export function evaluateSignal(
     appendKaizen(rec, 15);
   }
 
-  return { signal, snapshot };
+  return { signal, snapshot, rawFeatures };
 }

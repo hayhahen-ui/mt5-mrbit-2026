@@ -4,6 +4,8 @@ import { INITIAL_ASSETS } from '../data/mockData';
 import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
+import { observeCandidate } from '../lib/neural/observer';
+import { totalScore } from '../lib/scoring';
 
 export interface MarketDataState {
   assets: Asset[];
@@ -80,7 +82,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
         const signals: Record<string, Signal> = {};
         const snapshots: Record<string, MarketSnapshot> = {};
         const nextAssets = assets.map((a) => {
-          const { signal, snapshot } = evaluateSignal(
+          const { signal, snapshot, rawFeatures } = evaluateSignal(
             {
               asset: a,
               price: a.price,
@@ -96,6 +98,38 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
           snapshots[a.symbol] = snapshot;
           if (signal) {
             signals[a.symbol] = signal;
+
+            // Neural shadow: quan sát ứng viên, không can thiệp quyết định (skill §5)
+            if (signal.direction !== 'FLAT') {
+              try {
+                observeCandidate({
+                  symbol: a.symbol,
+                  direction: signal.direction,
+                  engine: signal.engine,
+                  engineName: signal.engineName,
+                  ruleScore: totalScore(signal.scoreBreakdown),
+                  ruleComponents: (signal.scoreBreakdown || []).map((f) => ({
+                    id: f.id, label: f.label, points: f.points, maxPoints: f.maxPoints, passed: f.passed,
+                  })),
+                  eligibility: snapshot.newsNear.length > 0 && signal.isHeadsUp ? 'blocked_news' : 'eligible',
+                  blockReason: signal.isHeadsUp ? 'news_window' : undefined,
+                  plan: {
+                    entry: signal.entryPrice, stop: signal.stopLoss,
+                    tp1: signal.tp1, tp2: signal.tp2, tp3: signal.tp3,
+                    suggestedLot: signal.suggestedLot,
+                  },
+                  rawFeatures,
+                  provenance: {
+                    source: a.sourceName || '—',
+                    asOf: new Date().toISOString(),
+                    availableAt: new Date(a.updatedAt || Date.now()).toISOString(),
+                    warmup: snapshot.warmup,
+                  },
+                  dataOrigin: 'live_observed',
+                });
+              } catch { /* observer không bao giờ chặn luồng tín hiệu */ }
+            }
+
             return {
               ...a,
               trendH1: (signal.direction === 'FLAT' ? 'FLAT' : signal.direction === 'BUY' ? 'BULL' : 'BEAR') as Asset['trendH1'],

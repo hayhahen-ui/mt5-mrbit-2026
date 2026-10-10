@@ -271,6 +271,8 @@ export const App: React.FC = () => {
                   onCloseWithOutcome={handleCloseWithOutcome}
                   newsFilter={checkNewsFilter(selectedAsset.symbol, news)}
                   recentJournal={journal}
+                  snapshot={snapshots[selectedAsset.symbol]}
+                  dataTick={lastUpdated}
                 />
               )}
               {activeTab === 'CTX' && <CtxTab marketContext={marketContext} asset={selectedAsset} />}

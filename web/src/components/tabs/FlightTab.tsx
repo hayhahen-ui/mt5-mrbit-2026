@@ -1,7 +1,8 @@
 import React from 'react';
-import { Signal, Asset, Position, JournalEntry, JournalOutcome } from '../../types';
+import { Signal, Asset, Position, JournalEntry, JournalOutcome, MarketSnapshot } from '../../types';
 import { TrendingUp, TrendingDown, Target, Shield, Zap, CheckCircle2, ChevronRight, X, AlertTriangle, BarChart3 } from 'lucide-react';
 import { totalScore, maxScore, getVerdict, VERDICT_META, NewsFilterResult } from '../../lib/scoring';
+import { NeuralPanel } from '../NeuralPanel';
 
 interface FlightTabProps {
   signal: Signal | undefined;
@@ -14,6 +15,8 @@ interface FlightTabProps {
   onCloseWithOutcome: (id: string, outcome: JournalOutcome) => void;
   newsFilter: NewsFilterResult;
   recentJournal: JournalEntry[];
+  snapshot: MarketSnapshot | undefined;
+  dataTick: number;
 }
 
 export const FlightTab: React.FC<FlightTabProps> = ({
@@ -25,7 +28,9 @@ export const FlightTab: React.FC<FlightTabProps> = ({
   onMoveToBE,
   onCloseWithOutcome,
   newsFilter,
-  recentJournal
+  recentJournal,
+  snapshot,
+  dataTick
 }) => {
   if (!signal) {
     return (
@@ -231,6 +236,9 @@ export const FlightTab: React.FC<FlightTabProps> = ({
             ))}
           </div>
         </div>
+
+        {/* 2c. NEURAL SHADOW (skill Mr.Bit P0) */}
+        <NeuralPanel signal={signal} snapshot={snapshot} refreshKey={dataTick} />
 
         {/* Price Levels Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs font-mono">
