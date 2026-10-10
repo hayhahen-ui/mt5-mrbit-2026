@@ -1,6 +1,7 @@
 import React from 'react';
 import { MarketContextState, Asset } from '../../types';
 import { Activity, BarChart2, Compass, Layers } from 'lucide-react';
+import { SentimentPanel } from '../SentimentPanel';
 
 interface CtxTabProps {
   marketContext: MarketContextState;
@@ -90,6 +91,9 @@ export const CtxTab: React.FC<CtxTabProps> = ({ marketContext, asset }) => {
           </div>
         </div>
       </div>
+
+      {/* 3. Tâm lý đám đông — MyFxBook Community Outlook */}
+      <SentimentPanel />
     </div>
   );
 };

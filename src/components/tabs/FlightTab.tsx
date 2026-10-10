@@ -5,6 +5,7 @@ import { totalScore, maxScore, getVerdict, VERDICT_META, NewsFilterResult } from
 import { usdPerPipPerLot, pipSizeOf, fmtUsd } from '../../lib/account';
 import { NeuralPanel } from '../NeuralPanel';
 import { AiAsk } from '../AiAsk';
+import { getOutlook, findSentiment, sentimentBias } from '../../lib/sentiment';
 
 interface FlightTabProps {
   signal: Signal | undefined;
@@ -379,7 +380,7 @@ export const FlightTab: React.FC<FlightTabProps> = ({
       {/* AI PHÂN TÍCH TÍN HIỆU */}
       <AiAsk
         buttonLabel="✨ AI PHÂN TÍCH TÍN HIỆU NÀY"
-        buildPrompt={() => {
+        buildPrompt={async () => {
           const factors = (signal.scoreBreakdown || [])
             .map((f) => `- ${f.label}: ${f.passed ? 'ĐẠT' : 'không đạt'} (${f.points}/${f.maxPoints}) — ${f.detail || ''}`)
             .join('\n');
@@ -393,6 +394,15 @@ export const FlightTab: React.FC<FlightTabProps> = ({
             `- Phiên đang mở: ${snapshot?.session || '—'}, biến động: ${snapshot?.atrProxy ?? '—'}%`,
             `- Tin HIGH gần (±60 phút): ${news}`,
             `- Nguồn giá: ${asset.sourceName || '—'}`,
+            `- Tâm lý đám đông MyFxBook: ${await (async () => {
+              try {
+                const r = await getOutlook(false);
+                const row = findSentiment(r.symbols, signal.symbol);
+                return row
+                  ? `#${signal.symbol} LONG ${row.longPct}% / SHORT ${row.shortPct}% — ${sentimentBias(row)}`
+                  : 'chưa có dữ liệu (nhập tài khoản MyFxBook ở HELP)';
+              } catch { return 'không lấy được'; }
+            })()}`,
             '',
             'Hãy phân tích: 1) Luận điểm vào lệnh có vững không, 2) Rủi ro lớn nhất,',
             '3) Khi nào nên bỏ/hủy kế hoạch, 4) Gợi ý quản lý lệnh (dời BE/chốt từng phần).',

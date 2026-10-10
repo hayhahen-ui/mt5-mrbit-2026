@@ -8,7 +8,7 @@ interface AiAskProps {
   /** Nhãn nút, VD: "AI PHÂN TÍCH TÍN HIỆU NÀY" */
   buttonLabel: string;
   /** Hàm dựng prompt từ dữ liệu mới nhất lúc bấm */
-  buildPrompt: () => string;
+  buildPrompt: () => string | Promise<string>;
   systemPrompt?: string;
   maxTokens?: number;
 }
@@ -73,7 +73,7 @@ export const AiAsk: React.FC<AiAskProps> = ({ buttonLabel, buildPrompt, systemPr
       const r = await aiChat(
         [
           { role: 'system', content: systemPrompt || DEFAULT_SYSTEM },
-          { role: 'user', content: buildPrompt() },
+          { role: 'user', content: await buildPrompt() },
         ],
         maxTokens,
       );
