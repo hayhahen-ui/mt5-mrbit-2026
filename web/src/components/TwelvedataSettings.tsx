@@ -66,9 +66,9 @@ export const TwelvedataSettings: React.FC = () => {
       </div>
       <p className="text-[11px] text-slate-400">
         Key miễn phí tại <span className="text-sky-300 font-mono">twelvedata.com</span> (đăng ký 2 phút).
-        Cho nến 5 phút thật của 9 cặp forex + Vàng + Bạc → radar/heatmap/mẫu hình nến
+        Cho nến 5 phút thật của 9 cặp forex + Vàng → radar/heatmap/mẫu hình nến
         có dữ liệu intraday thật, thay vì giá ER-API đứng yên cả ngày.
-        Free tier 800 credit/ngày — app dùng ~530.
+        Free tier 800 credit/ngày — app dùng ~480. Bạc (XAG/USD) chỉ có ở gói trả phí.
       </p>
       <div className="flex gap-2 flex-wrap">
         <input

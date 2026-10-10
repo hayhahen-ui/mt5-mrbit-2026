@@ -65,10 +65,15 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
     }
     return quotes;
   };
+  /** Chống 2 vòng TwelveData chạy chồng nhau (nguyên nhân spike vượt 8 credit/phút). */
+  const tdRunningRef = useRef(false);
   /** 1 chu kỳ TwelveData: nến 5m → kho masterdata → seed engine → heatmap → quotes. */
   const runTdCycle = useCallback(async (): Promise<boolean> => {
+    if (tdRunningRef.current) return false;
     if (!getTdKey() || !tdHasQuota(TD_LIST.length)) return false;
+    tdRunningRef.current = true;
     let ok = false;
+    try {
     for (let i = 0; i < TD_LIST.length; i++) {
       const sym = TD_LIST[i];
       try {
@@ -87,6 +92,9 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
         recordTdError(sym, e instanceof Error ? e.message : 'lỗi không rõ');
       }
       if (i < TD_LIST.length - 1) await sleep(TD_GAP_MS); // tôn trọng 8 credit/phút
+    }
+    } finally {
+      tdRunningRef.current = false;
     }
     try { window.dispatchEvent(new CustomEvent('td-updated')); } catch { /* noop */ }
     return ok;

@@ -1,6 +1,6 @@
 /**
  * twelvedata.ts — Client lấy nến forex intraday thật (thay giá daily đứng yên của ER-API).
- * Free tier: 8 credit/phút, 800 credit/ngày → chu kỳ 30 phút cho 11 mã ≈ 530 credit/ngày.
+ * Free tier: 8 credit/phút, 800 credit/ngày → chu kỳ 30 phút cho 10 mã ≈ 480 credit/ngày.
  * Key lưu localStorage máy user (như AI keys / MyFxBook), gọi qua /api/twelvedata.
  */
 export interface TdCandle { t: number; o: number; h: number; l: number; c: number }
@@ -9,17 +9,18 @@ const KEY = 'nexuspilot-twelvedata-v1';
 const USAGE_KEY = 'nexuspilot-twelvedata-usage-v1';
 const PROXY = '/api/twelvedata';
 
-/** Nến 5m qua TwelveData: 9 cặp forex + Vàng + Bạc */
+/** Nến 5m qua TwelveData: 9 cặp forex + Vàng.
+ *  XAG/USD (Bạc) CHỈ có ở gói trả phí Grow/Venture — đã gỡ khỏi vòng fetch để khỏi tốn credit. */
 export const TD_SYMBOLS: Record<string, string> = {
   EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY',
   AUDUSD: 'AUD/USD', NZDUSD: 'NZD/USD', USDCAD: 'USD/CAD',
   USDCHF: 'USD/CHF', EURJPY: 'EUR/JPY', GBPJPY: 'GBP/JPY',
-  XAUUSD: 'XAU/USD', XAGUSD: 'XAG/USD',
+  XAUUSD: 'XAU/USD',
 };
 export const TD_LIST = Object.keys(TD_SYMBOLS);
 /**
  * Mã được ghi đè quote bằng TwelveData.
- * XAUUSD GIỮ Gold-API 60s (tươi hơn nến 5m); XAGUSD chưa phải asset theo dõi nên không override.
+ * XAUUSD GIỮ Gold-API 60s (tươi hơn nến 5m) nên không override.
  */
 export const TD_QUOTE_LIST = [
   'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'NZDUSD',
@@ -101,8 +102,8 @@ export async function tdPrice(symbol: string): Promise<number> {
   return p;
 }
 
-/** Delay giữa các call để không vượt 8 credit/phút. */
-export const TD_GAP_MS = 8000;
+/** Delay giữa các call: 10s/call ≈ 6 credit/phút, chừa biên an toàn dưới trần 8. */
+export const TD_GAP_MS = 10000;
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Lỗi lần cuối theo từng mã (để UI hiện rõ lý do thiếu nến). */
