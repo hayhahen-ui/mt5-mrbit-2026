@@ -16,6 +16,8 @@ import { HelpTab } from './components/tabs/HelpTab';
 import { loadJournal, saveJournal, clearJournal, entryFromPosition, OUTCOME_META } from './lib/journal';
 import { checkNewsFilter, totalScore } from './lib/scoring';
 import { useMarketData } from './hooks/useMarketData';
+import { SessionClocks } from './components/SessionClocks';
+import { DashboardStrip } from './components/DashboardStrip';
 import { findLatestKaizenFor, linkKaizenOutcome, clearKaizen, loadKaizen } from './lib/kaizen';
 
 export const App: React.FC = () => {
@@ -216,6 +218,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans">
+      {/* Thanh đồng hồ phiên giao dịch realtime */}
+      <SessionClocks />
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#17223b] border border-sky-500/60 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 font-mono text-xs animate-bounce">
@@ -240,6 +245,15 @@ export const App: React.FC = () => {
         setSoundEnabled={setSoundEnabled}
         isMinimized={isMinimized}
         toggleMinimize={() => setIsMinimized(!isMinimized)}
+      />
+
+      {/* Dashboard tổng quan */}
+      <DashboardStrip
+        assets={assets}
+        signals={signals}
+        journal={journal}
+        onGoRadar={() => setActiveTab('RADAR')}
+        onGoLog={() => setActiveTab('LOG')}
       />
 
       {/* Main Body */}

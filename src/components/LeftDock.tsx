@@ -143,27 +143,38 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         </div>
       </div>
 
-      {/* 3. MTF Trend Matrix */}
+      {/* 3. MTF Trend Matrix — dữ liệu thật từ engine */}
       <div className="glass-panel p-3.5 space-y-2">
-        <div className="text-xs text-slate-400">XU HƯỚNG ĐA KHUNG (MTF)</div>
-        <div className="grid grid-cols-4 gap-1.5 text-center text-xs font-mono font-bold">
-          <div className="bg-[#0b0f19] p-1.5 rounded border border-[#1e2b48]">
-            <div className="text-[10px] text-slate-400 font-normal">M15</div>
-            <div className="text-emerald-400">▲ BULL</div>
-          </div>
-          <div className="bg-[#0b0f19] p-1.5 rounded border border-[#1e2b48]">
-            <div className="text-[10px] text-slate-400 font-normal">H1</div>
-            <div className="text-emerald-400">▲ BULL</div>
-          </div>
-          <div className="bg-[#0b0f19] p-1.5 rounded border border-[#1e2b48]">
-            <div className="text-[10px] text-slate-400 font-normal">H4</div>
-            <div className="text-emerald-400">▲ BULL</div>
-          </div>
-          <div className="bg-[#0b0f19] p-1.5 rounded border border-[#1e2b48]">
-            <div className="text-[10px] text-slate-400 font-normal">D1</div>
-            <div className="text-emerald-400">▲ BULL</div>
-          </div>
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>XU HƯỚNG ĐA KHUNG (MTF)</span>
+          <span className="text-[10px] font-mono text-sky-400">#{selectedAsset.symbol}</span>
         </div>
+        {(() => {
+          const sig = selectedAsset.signalDir;
+          const m15 = sig === 'BUY' ? 'BULL' : sig === 'SELL' ? 'BEAR' : 'FLAT';
+          const h1 = selectedAsset.trendH1;
+          const h4 = selectedAsset.change24h > 0.3 ? 'BULL' : selectedAsset.change24h < -0.3 ? 'BEAR' : 'FLAT';
+          const d1 = selectedAsset.change24h > 0 ? 'BULL' : selectedAsset.change24h < 0 ? 'BEAR' : 'FLAT';
+          const cell = (tf: string, t: string) => {
+            const cls = t === 'BULL' ? 'text-emerald-400' : t === 'BEAR' ? 'text-rose-400' : 'text-slate-500';
+            const arrow = t === 'BULL' ? '▲' : t === 'BEAR' ? '▼' : '●';
+            return (
+              <div className="bg-[#0b0f19] p-1.5 rounded border border-[#1e2b48]">
+                <div className="text-[10px] text-slate-400 font-normal">{tf}</div>
+                <div className={cls}>{arrow} {t}</div>
+              </div>
+            );
+          };
+          return (
+            <div className="grid grid-cols-4 gap-1.5 text-center text-xs font-mono font-bold">
+              {cell('M15', m15)}
+              {cell('H1', h1)}
+              {cell('H4', h4)}
+              {cell('D1', d1)}
+            </div>
+          );
+        })()}
+        <div className="text-[10px] text-slate-500">M15/H1 từ engine · H4/D1 từ biến động 24h thật</div>
       </div>
 
       {/* 4. Risk & Lot Calculator (CALC) */}
