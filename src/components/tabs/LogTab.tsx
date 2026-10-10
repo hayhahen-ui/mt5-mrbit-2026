@@ -4,7 +4,7 @@ import { JournalEntry } from '../../types';
 import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
 import { analyzeKaizen } from '../../lib/kaizen';
 import { fmtLocalTime } from '../../lib/time';
-import { entryPnlUsd, fmtUsd } from '../../lib/account';
+import { entryPnlUsd, fmtUsd, realizedPnlUsd } from '../../lib/account';
 
 interface LogTabProps {
   journal: JournalEntry[];
@@ -25,6 +25,7 @@ export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClear
   const cutoff = range === 'ALL' ? 0 : Date.now() - (range === '7D' ? 7 : 30) * 86400000;
   const fj = journal.filter((j) => new Date(j.closeTime).getTime() >= cutoff);
   const fs = calcJournalStats(fj);
+  const totalUsd = realizedPnlUsd(fj);
 
   const byQ = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'].map((q) => {
     const es = fj.filter((j) => j.quality === q);
@@ -121,7 +122,7 @@ ${rows}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 font-mono">
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
             <div className="text-[11px] text-slate-400">SIGNALS</div>
             <div className="text-2xl font-bold text-slate-100">{fs.total}</div>
@@ -145,6 +146,13 @@ ${rows}
               {fs.avgR >= 0 ? '+' : ''}{fs.avgR}
             </div>
             <div className="text-[10px] text-slate-500 font-sans">Tổng {fs.totalR >= 0 ? '+' : ''}{fs.totalR}R · PF {fs.profitFactor}</div>
+          </div>
+          <div className="bg-[#0b0f19] p-4 rounded-xl border border-emerald-800/60 space-y-1">
+            <div className="text-[11px] text-slate-400">LÃI/LỖ ($)</div>
+            <div className={`text-2xl font-bold ${totalUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {totalUsd >= 0 ? '+' : '-'}{fmtUsd(Math.abs(totalUsd))}
+            </div>
+            <div className="text-[10px] text-slate-500 font-sans">tổng tiền thật đã thực hiện ({range})</div>
           </div>
         </div>
 
