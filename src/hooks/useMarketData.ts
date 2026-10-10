@@ -58,11 +58,15 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
           let change24h = a.change24h;
           let source: DataSource = a.dataSource || 'OFFLINE';
           let sourceName = a.sourceName || '—';
+          // updatedAt chỉ cập nhật khi có quote thật — làm tín hiệu "giá tươi",
+          // để engine tự đóng lệnh không chạy trên giá mock lúc mới tải trang (fix F5 tự đóng lệnh)
+          let updatedAt = a.updatedAt || 0;
 
           if (q) {
             price = q.price;
             source = q.source;
             sourceName = q.sourceName;
+            updatedAt = Date.now();
             // % 24h: ưu tiên nguồn có sẵn, nếu không thì tính từ giá mở đầu ngày đã thấy
             if (q.change24h !== 0) {
               change24h = q.change24h;
@@ -75,7 +79,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
             history.push(a.symbol, price);
           }
 
-          return { ...a, price, change24h, dataSource: source, sourceName, updatedAt: Date.now(), warmup: history.warmup(a.symbol) };
+          return { ...a, price, change24h, dataSource: source, sourceName, updatedAt, warmup: history.warmup(a.symbol) };
         });
 
         // Engine đánh giá lại toàn bộ

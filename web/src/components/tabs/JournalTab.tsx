@@ -8,6 +8,7 @@ import {
   TIME_STOP_OPTIONS,
 } from '../../types';
 import { OUTCOME_META } from '../../lib/journal';
+import { fmtLocalTime } from '../../lib/time';
 
 interface JournalTabProps {
   positions: Position[];
@@ -340,7 +341,7 @@ export const JournalTab: React.FC<JournalTabProps> = ({
               <tbody className="divide-y divide-[#1e2b48] font-mono">
                 {[...journal].reverse().map((j) => (
                   <tr key={j.id} className="hover:bg-[#17223b]/40">
-                    <td className="py-2 text-slate-400 text-[11px]">{j.closeTime.slice(0, 16).replace('T', ' ')}</td>
+                    <td className="py-2 text-slate-400 text-[11px]">{fmtLocalTime(j.closeTime)}</td>
                     <td className="font-bold text-slate-200">{j.symbol}</td>
                     <td className={j.direction === 'BUY' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                       {j.direction}

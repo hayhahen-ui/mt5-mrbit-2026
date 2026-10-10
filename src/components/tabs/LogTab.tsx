@@ -3,6 +3,7 @@ import { Download, Trash2, BookOpen, FlaskConical, RotateCcw, BarChart3 } from '
 import { JournalEntry } from '../../types';
 import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
 import { analyzeKaizen } from '../../lib/kaizen';
+import { fmtLocalTime } from '../../lib/time';
 
 interface LogTabProps {
   journal: JournalEntry[];
@@ -57,7 +58,7 @@ export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClear
     const rows = journal
       .map(
         (j) =>
-          `<tr><td>${j.closeTime.slice(0, 16).replace('T', ' ')}</td><td>${j.symbol}</td><td>${j.direction}</td><td>${j.engineName}</td><td>${j.tier}</td><td>${j.lot}</td><td>${j.entryPrice}</td><td>${j.exitPrice}</td><td>${OUTCOME_META[j.outcome].label}</td><td>${j.rMultiple >= 0 ? '+' : ''}${j.rMultiple}R</td></tr>`
+          `<tr><td>${fmtLocalTime(j.closeTime)}</td><td>${j.symbol}</td><td>${j.direction}</td><td>${j.engineName}</td><td>${j.tier}</td><td>${j.lot}</td><td>${j.entryPrice}</td><td>${j.exitPrice}</td><td>${OUTCOME_META[j.outcome].label}</td><td>${j.rMultiple >= 0 ? '+' : ''}${j.rMultiple}R</td></tr>`
       )
       .join('');
     const reportHtml = `<!DOCTYPE html>
@@ -268,7 +269,7 @@ ${rows}
               <tbody className="divide-y divide-[#1e2b48] font-mono">
                 {[...journal].reverse().map((j) => (
                   <tr key={j.id} className="hover:bg-[#17223b]/40">
-                    <td className="py-2 text-slate-400 text-[11px]">{j.closeTime.slice(0, 16).replace('T', ' ')}</td>
+                    <td className="py-2 text-slate-400 text-[11px]">{fmtLocalTime(j.closeTime)}</td>
                     <td className="font-bold text-slate-200">{j.symbol}</td>
                     <td className={j.direction === 'BUY' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                       {j.direction}

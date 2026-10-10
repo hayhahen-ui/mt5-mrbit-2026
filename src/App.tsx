@@ -272,7 +272,10 @@ export const App: React.FC = () => {
     );
   };
 
-  // Engine BOT tự đóng lệnh: chạm TP/SL hoặc quá time-stop (chạy mỗi khi giá tick)
+  // Engine BOT tự đóng lệnh: chạm TP/SL hoặc quá time-stop (chạy mỗi khi giá tick).
+  // FIX F5 tự đóng lệnh: chỉ chạy khi giá là giá THẬT vừa poll (không phải giá mock
+  // lúc mới tải trang, và không quá cũ khi mất mạng). Thà bỏ lỡ còn hơn đóng nhầm.
+  const PRICE_STALE_MS = 15 * 60 * 1000; // 15 phút (cover cả forex poll 10')
   useEffect(() => {
     const nowTs = Date.now();
     for (const p of positionsRef.current) {
@@ -280,6 +283,8 @@ export const App: React.FC = () => {
       if (!ac || ac.mode !== 'AUTO') continue;
       const cur = assets.find((a) => a.symbol === p.symbol);
       if (!cur || cur.price <= 0) continue;
+      if (cur.dataSource === 'OFFLINE') continue; // chưa có giá thật sau khi tải trang
+      if (nowTs - (cur.updatedAt || 0) > PRICE_STALE_MS) continue; // giá quá cũ
       const px = cur.price;
       p.currentPrice = px; // đồng bộ giá thoát cho bản ghi sổ
       const hitTp = p.type === 'BUY' ? px >= p.tp : px <= p.tp;
