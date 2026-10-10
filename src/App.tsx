@@ -107,6 +107,20 @@ export const App: React.FC = () => {
     saveJournal(journal);
   }, [journal]);
 
+  // Toast khi lưới lọc chặn tick ảo (throttle 5 phút để không spam)
+  useEffect(() => {
+    let lastToast = 0;
+    const onBad = (e: Event) => {
+      const now = Date.now();
+      if (now - lastToast < 5 * 60_000) return;
+      lastToast = now;
+      const d = (e as CustomEvent).detail || {};
+      showToast(`🛡️ Chặn tick ảo ${d.sym}: ${d.old} → ${d.bad} (nhảy ${Number(d.jumpPct || 0).toFixed(1)}%) — giữ giá cũ`);
+    };
+    window.addEventListener('badtick', onBad);
+    return () => window.removeEventListener('badtick', onBad);
+  }, []);
+
   // 1. Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

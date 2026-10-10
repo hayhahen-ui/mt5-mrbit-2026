@@ -12,6 +12,7 @@ import { recordPricePoints } from '../lib/priceHistory';
 import { fetchEconomicCalendar, getNewsSourceName } from '../lib/news';
 import { PriceHistory, evaluateSignal } from '../lib/signalEngine';
 import { getEngineToggles } from '../lib/engines';
+import { guardQuote } from '../lib/quoteGuard';
 import { observeCandidate } from '../lib/neural/observer';
 import { recordPrices, seedCloses, HEATMAP_SYMBOLS } from '../lib/priceHistory';
 import { maybeForexSnapshot } from '../lib/forexJournal';
@@ -101,6 +102,8 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
     return ok;
   }, []);
   const dayOpenRef = useRef<Record<string, { day: string; open: number }>>({});
+  /** Giá hợp lệ cuối cùng theo mã — mốc để phát hiện tick ảo */
+  const lastPriceRef = useRef<Record<string, number>>({});
   const equityRef = useRef(equity);
   const riskRef = useRef(riskPct);
   equityRef.current = equity;
@@ -111,10 +114,19 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       const history = historyRef.current;
       const today = new Date().toISOString().slice(0, 10);
 
+      // LƯỚI LỌC TICK ẢO: mọi quote qua guardQuote trước khi vào giá/heatmap/engine.
+      // Tick nhảy quá ngưỡng (vd Gold-API trả giá stale) bị từ chối, giữ giá cũ.
+      const clean: typeof quotes = {};
+      for (const [sym, q] of Object.entries(quotes)) {
+        if (!q || q.source === 'OFFLINE' || !Number.isFinite(q.price) || q.price <= 0) continue;
+        const g = guardQuote(sym, q.price, lastPriceRef.current[sym] || 0);
+        if (g.accept) clean[sym] = q;
+      }
+
       // Nhật ký dữ liệu forex: ghi lịch sử giá (heatmap) + snapshot 15 phút
       try {
         const realPrices: Record<string, number> = {};
-        for (const [sym, q] of Object.entries(quotes)) {
+        for (const [sym, q] of Object.entries(clean)) {
           if (q && q.source !== 'OFFLINE' && Number.isFinite(q.price) && q.price > 0) {
             realPrices[sym] = q.price;
           }
@@ -128,7 +140,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
 
       setState((prev) => {
         const assets = prev.assets.map((a) => {
-          const q = quotes[a.symbol];
+          const q = clean[a.symbol];
           let price = a.price;
           let change24h = a.change24h;
           let source: DataSource = a.dataSource || 'OFFLINE';
@@ -154,6 +166,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
             history.push(a.symbol, price);
           }
 
+          if (price > 0) lastPriceRef.current[a.symbol] = price;
           return { ...a, price, change24h, dataSource: source, sourceName, updatedAt, warmup: history.warmup(a.symbol) };
         });
 

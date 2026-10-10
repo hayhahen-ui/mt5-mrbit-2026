@@ -8,6 +8,7 @@ import {
 } from '../../lib/engines';
 import { evalSessions } from '../../lib/sessions';
 import { currentSession } from '../../lib/signalEngine';
+import { guardStats } from '../../lib/quoteGuard';
 
 interface SigTabProps {
   newsEvents: NewsEvent[];
@@ -87,9 +88,10 @@ export const SigTab: React.FC<SigTabProps> = ({
   const warmup = snapshot?.warmup || asset?.warmup || '0/20';
   const src = snapshot?.dataSource || asset?.dataSource || 'OFFLINE';
   const ageMin = asset?.updatedAt ? Math.max(0, Math.round((Date.now() - asset.updatedAt) / 60000)) : null;
+  const gs = guardStats();
   gates.push({
     id: 'data', label: 'Độ tươi dữ liệu', blocking: false, pass: null,
-    detail: `Warmup ${warmup} · nguồn ${src}${ageMin !== null ? ` · giá cách đây ${ageMin} phút` : ''}`,
+    detail: `Warmup ${warmup} · nguồn ${src}${ageMin !== null ? ` · giá cách đây ${ageMin} phút` : ''} · đã chặn ${gs.rejected} tick ảo`,
   });
 
   const blockedGates = gates.filter((g) => g.blocking && g.pass === false);
