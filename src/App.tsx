@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { checkApiOrigin, PROD_URL } from './lib/apiHealth';
 import { TabType, Asset, Signal, Position, AccountState, MarketContextState, JournalEntry, JournalOutcome, AutoCloseConfig } from './types';
 import {
   INITIAL_MARKET_CONTEXT,
@@ -127,10 +128,8 @@ export const App: React.FC = () => {
   // cho mọi /api/* → thay vì lỗi "Unexpected token" cryptic, hiện banner rõ ràng.
   useEffect(() => {
     let alive = true;
-    import('./lib/apiHealth').then(({ checkApiOrigin, PROD_URL }) => {
-      checkApiOrigin().then((r) => {
-        if (alive && !r.ok) setApiOriginWarn(`${r.reason || 'Không kết nối được API.'} — Mở đúng: ${PROD_URL}`);
-      });
+    checkApiOrigin().then((r) => {
+      if (alive && !r.ok) setApiOriginWarn(r.reason || 'Không kết nối được API.');
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -379,7 +378,8 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans">
       {apiOriginWarn && (
         <div className="mx-3 mt-3 rounded-lg border border-red-500/60 bg-red-950/60 px-4 py-3 text-sm text-red-200">
-          <span className="font-bold">⚠️ SAI URL — API KHÔNG TỒN TẠI:</span> {apiOriginWarn}
+          <span className="font-bold">⚠️ SAI URL — API KHÔNG TỒN TẠI:</span> {apiOriginWarn}{' '}
+          <a href={PROD_URL} className="underline font-bold text-red-100 hover:text-white">Mở đúng URL tại đây</a>
         </div>
       )}
       {/* Thanh đồng hồ phiên giao dịch realtime */}
