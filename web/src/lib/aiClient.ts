@@ -3,6 +3,7 @@
  * Key lấy từ kho localStorage của user, gửi kèm mỗi request (proxy không lưu).
  */
 import { getActiveProvider, getAiKey } from './aiKeys';
+import { readApiJson } from './apiHealth';
 
 export interface AiChatMessage { role: 'user' | 'assistant' | 'system'; content: string }
 
@@ -12,7 +13,7 @@ async function callProxy(payload: Record<string, unknown>) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const d = await r.json();
+  const d = await readApiJson(r, 'AI');
   return d as { ok: boolean; valid?: boolean; content?: string; error?: string };
 }
 

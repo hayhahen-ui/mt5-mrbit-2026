@@ -43,7 +43,8 @@ export const MfSettings: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: useEmail, password: usePass }),
       });
-      const d = await r.json();
+      const { readApiJson } = await import('../lib/apiHealth');
+      const d = await readApiJson(r, 'MyFxBook');
       setMsg(d.ok
         ? { ok: true, text: `Kết nối OK — lấy được outlook ${d.symbols?.length || 0} mã.` }
         : { ok: false, text: `Thất bại: ${d.error || 'kiểm tra lại tài khoản.'}` });

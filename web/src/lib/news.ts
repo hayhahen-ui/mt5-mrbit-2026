@@ -1,4 +1,5 @@
 import { NewsEvent } from '../types';
+import { readApiJson } from './apiHealth';
 import { INITIAL_NEWS } from '../data/mockData';
 
 /**
@@ -22,8 +23,8 @@ async function fetchJsonWithTimeout(url: string, ms: number): Promise<any> {
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    if (!res.ok && !url.startsWith('/api/')) throw new Error(`HTTP ${res.status}`);
+    return await readApiJson(res, 'Lịch tin');
   } finally {
     clearTimeout(t);
   }
