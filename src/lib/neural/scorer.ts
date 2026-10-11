@@ -10,6 +10,8 @@ export interface ScorerInput {
   setupId: string;
   featureVersion: string;
   predictionAsOf: string;
+  /** Giá trị feature đã chuẩn bị (TrainedScorer dùng; NotTrainedScorer bỏ qua). */
+  features?: Record<string, number | null>;
 }
 
 export interface Scorer {

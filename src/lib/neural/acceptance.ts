@@ -56,14 +56,21 @@ export function runAcceptance(): TestResult[] {
     `record=${r01.record === null}, assessment=${r01.assessment === null}, count=${countNeuralRecords()}`);
   setNeuralMode('shadow');
 
-  // T02 — shadow, chưa model: not_trained + dự báo null, không gọi order API
+  // T02 — shadow, có model thật: ready + dự báo số, không gọi order API
+  // (trước khi train: kỳ vọng not_trained + null; sau khi train: ready + số)
   clearNeuralRecords();
   const r02 = observeCandidate(makeCandidate());
   const a02 = r02.assessment!;
-  push('T02', 'Shadow chưa model → not_trained, dự báo null',
-    a02.status === 'not_trained' && a02.pNetPositive === null && a02.expectedNetR === null &&
-    a02.modelVersion === null && a02.reasonCodes.includes('MODEL_NOT_AVAILABLE') && r02.record !== null,
-    `status=${a02.status}, p=${a02.pNetPositive}, model=${a02.modelVersion}`);
+  const trained = a02.modelVersion !== null;
+  push('T02', 'Shadow có model → ready, dự báo là số hợp lệ',
+    trained
+      ? (a02.status === 'ready' && typeof a02.pNetPositive === 'number' &&
+         a02.pNetPositive >= 0 && a02.pNetPositive <= 1 &&
+         typeof a02.expectedNetR === 'number' && isFinite(a02.expectedNetR) &&
+         typeof a02.uncertainty === 'number' && r02.record !== null)
+      : (a02.status === 'not_trained' && a02.pNetPositive === null && a02.expectedNetR === null &&
+         a02.modelVersion === null && a02.reasonCodes.includes('MODEL_NOT_AVAILABLE') && r02.record !== null),
+    `status=${a02.status}, p=${a02.pNetPositive}, R=${a02.expectedNetR}, model=${a02.modelVersion}`);
 
   // T04 — snapshot bất biến trước dữ liệu mới
   const cand04 = makeCandidate({ symbol: 'BTCUSD' });

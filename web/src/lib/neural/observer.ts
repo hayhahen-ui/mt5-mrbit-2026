@@ -3,7 +3,8 @@ import {
   SCHEMA_VERSION, STRATEGY_VERSION, EXECUTION_POLICY_VERSION, DataProvenance,
 } from './contracts';
 import { buildFeatures, hasMissingRequired, RawFeatureInputs } from './features';
-import { NotTrainedScorer, insufficientDataAssessment } from './scorer';
+import { NotTrainedScorer, insufficientDataAssessment, Scorer } from './scorer';
+import { TrainedScorer, isTrainedModelAvailable } from './trainedScorer';
 import { saveNeuralRecord } from './repository';
 
 /**
@@ -51,7 +52,13 @@ export interface ObserveResult {
   deduped: boolean;
 }
 
-const scorer = new NotTrainedScorer();
+// Model thật (nếu đã train) → TrainedScorer; chưa có weights → NotTrainedScorer như cũ.
+const scorer: Scorer = (() => {
+  try {
+    if (isTrainedModelAvailable()) return new TrainedScorer();
+  } catch { /* fallback */ }
+  return new NotTrainedScorer();
+})();
 
 /** Dedup key ổn định: strategy + mã + hướng + engine + bucket phút trigger */
 function makeDedupKey(c: CandidateInput, asOf: string): string {
@@ -75,7 +82,12 @@ export function observeCandidate(candidate: CandidateInput): ObserveResult {
     if (hasMissingRequired(featureSet)) {
       assessment = insufficientDataAssessment(mode, asOf, featureSet.version, featureSet.missing);
     } else {
-      assessment = scorer.score({ setupId, featureVersion: featureSet.version, predictionAsOf: asOf });
+      assessment = scorer.score({
+        setupId,
+        featureVersion: featureSet.version,
+        predictionAsOf: asOf,
+        features: featureSet.values,
+      });
       assessment.mode = mode;
     }
     assessment.latencyMs = Math.round((performance.now() - t0) * 10) / 10;
