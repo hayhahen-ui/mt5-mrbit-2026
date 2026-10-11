@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { referenceSourcesPrompt } from '../../data/referenceSources';
 import { Signal, Asset, Position, JournalEntry, JournalOutcome, MarketSnapshot } from '../../types';
 import { TrendingUp, TrendingDown, Target, Shield, Zap, CheckCircle2, ChevronRight, X, AlertTriangle, BarChart3, RotateCcw, PencilLine } from 'lucide-react';
 import { totalScore, maxScore, getVerdict, VERDICT_META, NewsFilterResult } from '../../lib/scoring';
@@ -409,6 +410,8 @@ export const FlightTab: React.FC<FlightTabProps> = ({
             'Hãy phân tích: 1) Luận điểm vào lệnh có vững không, 2) Rủi ro lớn nhất,',
             '3) Khi nào nên bỏ/hủy kế hoạch, 4) Gợi ý quản lý lệnh (dời BE/chốt từng phần).',
             'Ngắn gọn, tiếng Việt.',
+            '',
+            referenceSourcesPrompt(),
           ].join('\n');
         }}
       />

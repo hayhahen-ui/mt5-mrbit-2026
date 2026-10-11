@@ -1,4 +1,5 @@
 import React from 'react';
+import { REFERENCE_SOURCES, VN_REGULATORY_NOTE, referenceSourcesPrompt } from '../../data/referenceSources';
 import { NewsEvent } from '../../types';
 import { Calendar, AlertCircle, Clock, Radio } from 'lucide-react';
 import { AiAsk } from '../AiAsk';
@@ -59,6 +60,8 @@ export const NewsTab: React.FC<NewsTabProps> = ({ newsEvents, newsSource }) => {
                   'Hãy: 1) Liệt kê 3-5 tin quan trọng nhất cần tránh giao dịch (kèm giờ),',
                   '2) Nhận định nhanh tác động lên USD/EUR/JPY/XAUUSD,',
                   '3) Gợi ý khung giờ nào trong tuần cần đứng ngoài. Ngắn gọn, tiếng Việt.',
+                  '',
+                  referenceSourcesPrompt(),
                 ].join('\n');
               }}
               systemPrompt="Bạn là trợ lý phân tích lịch kinh tế cho trader. Trả lời bằng tiếng Việt, ngắn gọn, dạng gạch đầu dòng."
@@ -119,6 +122,30 @@ export const NewsTab: React.FC<NewsTabProps> = ({ newsEvents, newsSource }) => {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="glass-panel p-5 mt-4">
+        <div className="font-bold text-sm text-slate-100 mb-1">📚 NGUỒN THAM CHIẾU TIN CẬY</div>
+        <div className="text-[11px] text-slate-400 mb-3">Do user sưu tầm 11/10/2026 — đã nạp vào prompt của AI phân tích. Bấm để mở nguồn gốc.</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {REFERENCE_SOURCES.map((cat) => (
+            <div key={cat.id} className="rounded-lg border border-[#1e2b48] bg-[#0d1526] p-3">
+              <div className="text-xs font-bold text-slate-200 mb-2">{cat.title}</div>
+              <div className="space-y-2">
+                {cat.sources.map((src) => (
+                  <div key={src.name} className="text-[11px]">
+                    <a href={src.url} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-300 underline font-medium">{src.name}</a>
+                    <div className="text-slate-400 mt-0.5">{src.provides}</div>
+                    <div className="text-slate-500 italic">{src.usage}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 text-[11px] text-amber-300/90 border border-amber-800/50 bg-amber-950/30 rounded-lg p-2.5">
+          ⚖️ {VN_REGULATORY_NOTE}
         </div>
       </div>
     </div>
