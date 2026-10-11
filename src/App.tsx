@@ -85,6 +85,7 @@ export const App: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [apiOriginWarn, setApiOriginWarn] = useState<string | null>(null);
   const [resetMark, setResetMark] = useState<number | null>(() => getResetMark());
   const liveAccount: AccountState = { ...account, balance: liveBalance, equity: liveEquity };
 
@@ -119,6 +120,19 @@ export const App: React.FC = () => {
     };
     window.addEventListener('badtick', onBad);
     return () => window.removeEventListener('badtick', onBad);
+  }, []);
+
+  // Kiểm tra 1 lần khi mở app: /api/* có tồn tại trên URL hiện tại không.
+  // Nếu user mở nhầm URL (bookmark cũ / deployment lạ), Vercel trả 404 HTML
+  // cho mọi /api/* → thay vì lỗi "Unexpected token" cryptic, hiện banner rõ ràng.
+  useEffect(() => {
+    let alive = true;
+    import('./lib/apiHealth').then(({ checkApiOrigin, PROD_URL }) => {
+      checkApiOrigin().then((r) => {
+        if (alive && !r.ok) setApiOriginWarn(`${r.reason || 'Không kết nối được API.'} — Mở đúng: ${PROD_URL}`);
+      });
+    }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   // 1. Keyboard Shortcuts Listener
@@ -363,6 +377,11 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans">
+      {apiOriginWarn && (
+        <div className="mx-3 mt-3 rounded-lg border border-red-500/60 bg-red-950/60 px-4 py-3 text-sm text-red-200">
+          <span className="font-bold">⚠️ SAI URL — API KHÔNG TỒN TẠI:</span> {apiOriginWarn}
+        </div>
+      )}
       {/* Thanh đồng hồ phiên giao dịch realtime */}
       <SessionClocks />
 

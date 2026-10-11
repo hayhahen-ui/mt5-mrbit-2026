@@ -3,6 +3,7 @@
  * - Credential (email/password) lưu localStorage TRÊN MÁY USER (như AI key).
  * - Cache 15 phút (giới hạn tài khoản MyFxBook free).
  */
+import { readApiJson } from './apiHealth';
 const CRED_KEY = 'nexuspilot-mf-cred-v1';
 const CACHE_KEY = 'nexuspilot-mf-outlook-v1';
 const CACHE_MS = 15 * 60 * 1000;
@@ -82,7 +83,7 @@ export async function getOutlook(force = false): Promise<{ symbols: SentimentRow
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: cred.email, password: cred.password }),
     });
-    const d = await r.json();
+    const d = await readApiJson(r, 'MyFxBook');
     if (!d.ok) return { symbols: cache?.symbols || [], cached: true, error: d.error || 'Lỗi MyFxBook.' };
     const symbols = (d.symbols || []) as SentimentRow[];
     try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), symbols })); } catch { /* noop */ }

@@ -3,6 +3,7 @@
  * Free tier: 8 credit/phút, 800 credit/ngày → chu kỳ 30 phút cho 10 mã ≈ 480 credit/ngày.
  * Key lưu localStorage máy user (như AI keys / MyFxBook), gọi qua /api/twelvedata.
  */
+import { readApiJson } from './apiHealth';
 export interface TdCandle { t: number; o: number; h: number; l: number; c: number }
 
 const KEY = 'nexuspilot-twelvedata-v1';
@@ -67,7 +68,7 @@ async function tdCall(endpoint: string, params: Record<string, string>): Promise
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ apikey, endpoint, params }),
   });
-  const d = await r.json();
+  const d = await readApiJson(r, 'TwelveData');
   if (d.error) throw new Error(d.error);
   return d;
 }
