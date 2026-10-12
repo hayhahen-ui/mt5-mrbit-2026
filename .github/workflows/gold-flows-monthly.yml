@@ -1,0 +1,61 @@
+# .github/workflows/gold-flows-monthly.yml
+# Cập nhật dòng vốn vàng hàng tháng vào kho online.
+# WGC KHÔNG có public API → Action này giữ khung, dữ liệu WGC do user nhập tay
+# hoặc cập nhật thủ công; GLD proxy do app tự đẩy khi có TwelveData key.
+name: Gold flows monthly
+
+on:
+  schedule:
+    - cron: '0 1 5 * *'  # Ngày 5 hàng tháng, 08:00 VN
+  workflow_dispatch:
+    inputs:
+      flow_tons:
+        description: 'WGC flow tháng trước (tấn, dương=vào)'
+        required: false
+        default: ''
+      total_tons:
+        description: 'Tổng holdings (tấn)'
+        required: false
+        default: ''
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update gold flows cache
+        env:
+          PAT: ${{ secrets.FRED_PUSH_PAT }}
+          FLOW_TONS: ${{ inputs.flow_tons }}
+          TOTAL_TONS: ${{ inputs.total_tons }}
+        run: |
+          git config --global user.name "gold-bot"
+          git config --global user.email "gold-bot@users.noreply.github.com"
+          rm -rf data-br && git clone --depth 1 --branch data \
+            "https://x-access-token:${PAT}@github.com/hayhahen-ui/mt5-mrbit-2026.git" data-br
+          mkdir -p data-br/research/gold-flows
+          python3 - <<'EOF'
+          import json, os, datetime
+          path = 'data-br/research/gold-flows/latest.json'
+          try:
+              with open(path) as f: cur = json.load(f)
+          except: cur = {}
+          flow = os.environ.get('FLOW_TONS', '').strip()
+          total = os.environ.get('TOTAL_TONS', '').strip()
+          wgc = cur.get('wgc') or {}
+          if flow:
+              month = (datetime.date.today().replace(day=1) - datetime.timedelta(days=1)).strftime('%Y-%m')
+              wgc = {'month': month, 'flowTons': float(flow),
+                     'totalTons': float(total) if total else wgc.get('totalTons'),
+                     'source': 'WGC (nhập tay)', 'updatedAt': datetime.datetime.utcnow().isoformat() + 'Z'}
+          snap = {'updatedAt': datetime.datetime.utcnow().isoformat() + 'Z',
+                  'wgc': wgc if wgc.get('month') else None,
+                  'gld': cur.get('gld'),
+                  'note': 'WGC hàng tháng (tay) + GLD proxy hàng ngày (app tự đẩy)'}
+          with open(path, 'w') as f: json.dump(snap, f, indent=1)
+          print('OK:', json.dumps(snap)[:200])
+          EOF
+          cd data-br
+          git add research/gold-flows/latest.json
+          git diff --cached --quiet && echo "Không có gì mới" && exit 0
+          git commit -m "gold-flows monthly update (github-action)"
+          git push origin data

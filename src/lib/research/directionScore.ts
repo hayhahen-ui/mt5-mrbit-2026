@@ -82,6 +82,8 @@ export interface DirectionInputs {
   sentimentLongPct?: number | null;
   /** Dòng vốn vàng thủ công (tấn, dương = vào) — nhập tay từ WGC */
   goldFlowTons?: number | null;
+  /** Tín hiệu GLD proxy (-2..+2) — từ TwelveData */
+  gldSignal?: number | null;
 }
 
 export function computeDirectionScore(inp: DirectionInputs): DirectionResult {
@@ -132,26 +134,31 @@ export function computeDirectionScore(inp: DirectionInputs): DirectionResult {
         break;
       }
       case 'goldflows': {
-        // Ưu tiên: số liệu WGC nhập tay (tấn). Fallback: biến động DGS10 (lợi suất tăng = dòng ra khỏi vàng)
+        // Tầng 1: WGC nhập tay (tấn/tháng) — chính xác nhất
+        // Tầng 2: GLD proxy (TwelveData) — tự động hàng ngày
+        // Tầng 3: DGS10 proxy — fallback cuối
         const tons = inp.goldFlowTons;
+        const gld = inp.gldSignal;
         let s: number | null = null;
-        let detail = 'Chưa có API WGC tự động — nhập tay tại tab NGHIÊN CỨU (gold.org)';
+        let detail = 'Chưa có dữ liệu — nhập WGC tay hoặc chờ GLD';
+        let ev: 'FACT' | 'CALCULATION' | 'UNVERIFIED' = 'UNVERIFIED';
         if (tons !== null && tons !== undefined) {
           s = tons >= 20 ? 2 : tons >= 5 ? 1 : tons <= -20 ? -2 : tons <= -5 ? -1 : 0;
-          detail = `WGC ETF flow: ${tons >= 0 ? '+' : ''}${tons} tấn/tuần (nhập tay)`;
+          detail = `WGC ETF flow: ${tons >= 0 ? '+' : ''}${tons} tấn/tháng (nhập tay)`;
+          ev = 'FACT';
+        } else if (gld !== null && gld !== undefined) {
+          s = Math.max(-2, Math.min(2, Math.round(gld)));
+          detail = `GLD proxy: tín hiệu ${s >= 0 ? '+' : ''}${s}/2 (volume + giá)`;
+          ev = 'CALCULATION';
         } else {
-          // Proxy: DGS10 giảm = lợi suất giảm = hỗ trợ vàng
           const d10Chg = dgs10.change;
           if (d10Chg !== null && d10Chg !== undefined) {
             s = scoreFromChange(d10Chg, -0.15, 0.15, false);
-            detail = `Proxy qua DGS10 (${d10Chg >= 0 ? '+' : ''}${d10Chg.toFixed(2)}pp) — chưa có số WGC`;
+            detail = `Proxy DGS10 (${d10Chg >= 0 ? '+' : ''}${d10Chg.toFixed(2)}pp)`;
+            ev = 'CALCULATION';
           }
         }
-        groups.push({
-          ...def, score: s,
-          evidence: s === null ? 'UNVERIFIED' : (tons !== null && tons !== undefined ? 'FACT' : 'CALCULATION'),
-          detail, sourceIds: ['S22', 'S13'],
-        });
+        groups.push({ ...def, score: s, evidence: ev, detail, sourceIds: ['S22', 'S13'] });
         break;
       }
       case 'structure': {

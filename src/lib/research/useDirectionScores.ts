@@ -4,6 +4,8 @@ import { fetchFredSnapshotOnline, pushFredSnapshot, lastFredPushAt, snapshotToSe
 import { computeDirectionScore, DirectionResult } from './directionScore';
 import { Signal } from '../../types';
 import { getCachedOutlook, findSentiment } from '../sentiment';
+import { fetchGoldFlows } from './goldFlows';
+import { getTdKey } from '../twelvedata';
 
 /** Đọc dòng vốn vàng nhập tay (localStorage). */
 export function getGoldFlow(): number | null {
@@ -15,6 +17,22 @@ export function getGoldFlow(): number | null {
     if (Date.now() - d.at > 14 * 86400000) return null;
     return typeof d.tons === 'number' ? d.tons : null;
   } catch { return null; }
+}
+
+/** WGC online (tấn/tháng) — từ kho GitHub. */
+export function useWgcOnline(): number | null {
+  const [v, setV] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const flows = await fetchGoldFlows();
+      if (alive && flows?.wgc?.flowTons !== null && flows?.wgc?.flowTons !== undefined) {
+        setV(flows.wgc.flowTons);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+  return v;
 }
 export function setGoldFlow(tons: number | null): void {
   try {
@@ -38,6 +56,32 @@ export interface FredSource {
  * 3. Cache localStorage.
  * Khi lấy được dữ liệu tươi qua API → tự đẩy snapshot lên kho online (nếu có PAT, tối đa 1 lần/6h).
  */
+export function useGoldFlowSignal(): number | null {
+  const [sig, setSig] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      // 1) Kho online (WGC + GLD)
+      const flows = await fetchGoldFlows();
+      if (alive && flows?.gld?.signal !== null && flows?.gld?.signal !== undefined) {
+        setSig(flows.gld.signal);
+        return;
+      }
+      // 2) Trực tiếp qua TwelveData (nếu máy có key)
+      const tdKey = getTdKey();
+      if (tdKey) {
+        try {
+          const { fetchGldDaily } = await import('./goldFlows');
+          const gld = await fetchGldDaily(tdKey);
+          if (alive && gld?.signal !== null && gld?.signal !== undefined) setSig(gld.signal);
+        } catch { /* lặng lẽ */ }
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+  return sig;
+}
+
 export function useDirectionScores(signals: Record<string, Signal>): {
   scores: Record<string, DirectionResult>;
   fred: Record<FredSeriesId, FredSeries> | null;
@@ -46,6 +90,8 @@ export function useDirectionScores(signals: Record<string, Signal>): {
 } {
   const [fred, setFred] = useState<Record<FredSeriesId, FredSeries> | null>(null);
   const [source, setSource] = useState<FredSource>({ kind: 'cache', ageH: null, label: 'Đang tải…' });
+  const gldSignal = useGoldFlowSignal();
+  const wgcOnline = useWgcOnline();
 
   useEffect(() => {
     let alive = true;
@@ -83,7 +129,8 @@ export function useDirectionScores(signals: Record<string, Signal>): {
     const out: Record<string, DirectionResult> = {};
     if (!fred) return out;
     const outlook = getCachedOutlook();
-    const goldFlow = getGoldFlow();
+    // Ưu tiên: WGC online > nhập tay
+    const goldFlow = wgcOnline !== null ? wgcOnline : getGoldFlow();
     for (const sym of RESEARCH_SYMBOLS) {
       const sig = signals[sym];
       const sent = findSentiment(outlook, sym);
@@ -94,10 +141,11 @@ export function useDirectionScores(signals: Record<string, Signal>): {
         priceScore: sig?.scoreBreakdown ? sig.scoreBreakdown.reduce((s, f: any) => s + f.points, 0) : 0,
         sentimentLongPct: sent ? sent.longPct : null,
         goldFlowTons: sym === 'XAUUSD' ? goldFlow : null,
+        gldSignal: sym === 'XAUUSD' ? gldSignal : null,
       });
     }
     return out;
-  }, [fred, signals]);
+  }, [fred, signals, gldSignal, wgcOnline]);
 
   return { scores, fred, fredLoaded: !!fred, fredSource: source };
 }
