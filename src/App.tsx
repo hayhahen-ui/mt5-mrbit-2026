@@ -352,12 +352,19 @@ export const App: React.FC = () => {
       if (nowTs - (cur.updatedAt || 0) > PRICE_STALE_MS) continue; // giá quá cũ
       const px = cur.price;
       p.currentPrice = px; // đồng bộ giá thoát cho bản ghi sổ
+      // Tính P&L TƯƠI tại đây (p.pnl từ setPositions bất đồng bộ → stale, không kịp cắt ở ngưỡng $)
+      const diffLive = p.type === 'BUY' ? px - p.entryPrice : p.entryPrice - px;
+      const isJpyLive = p.symbol.includes('JPY');
+      const pipSizeLive = isJpyLive ? 0.01 : cur.category === 'Forex' ? 0.0001 : 0.1;
+      const usdPerPipLive = isJpyLive ? 1000 / px : cur.category === 'Forex' ? 10 : 1;
+      const pnlLive = (diffLive / pipSizeLive) * p.lot * usdPerPipLive;
+      p.pnl = Number(pnlLive.toFixed(2));
       const hitTp = p.type === 'BUY' ? px >= p.tp : px <= p.tp;
       const hitSl = p.type === 'BUY' ? px <= p.sl : px >= p.sl;
-      // ĂN NON: lời đạt ngưỡng $ → đóng ngay (trước cả TP giá)
-      if (ac.tpUsd != null && ac.tpUsd > 0 && (p.pnl || 0) >= ac.tpUsd) {
+      // ĂN NON / CẮT LỖ SỚM dùng pnlLive — ưu tiên cao nhất
+      if (ac.tpUsd != null && ac.tpUsd > 0 && pnlLive >= ac.tpUsd) {
         handleCloseWithOutcome(p.id, 'TP', 'auto', `ăn-non +$${ac.tpUsd}`);
-      } else if (ac.slUsd != null && ac.slUsd > 0 && (p.pnl || 0) <= -ac.slUsd) {
+      } else if (ac.slUsd != null && ac.slUsd > 0 && pnlLive <= -ac.slUsd) {
         handleCloseWithOutcome(p.id, 'SL', 'auto', `cắt-lỗ-sớm -$${ac.slUsd}`);
       } else if (ac.tp && hitTp) {
         handleCloseWithOutcome(p.id, 'TP', 'auto', 'auto-TP');
