@@ -1,5 +1,5 @@
 import { NewsEvent } from '../types';
-import { readApiJson } from './apiHealth';
+import { readApiJson, apiUrl } from './apiHealth';
 import { INITIAL_NEWS } from '../data/mockData';
 
 /**
@@ -16,7 +16,7 @@ const WINDOW_MIN = 30; // ±30 phút quanh giờ tin = cửa sổ chặn tín hi
  * (dù mở tab mới vẫn xem được). Lấy qua proxy nội bộ /api/ff-calendar (serverless
  * function của chính app, chạy phía server nên không bị CORS).
  */
-const FF_PROXY_URL = '/api/ff-calendar';
+const FF_PROXY_URL = apiUrl('/api/ff-calendar');
 
 async function fetchJsonWithTimeout(url: string, ms: number): Promise<any> {
   const ctrl = new AbortController();
