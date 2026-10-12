@@ -202,8 +202,13 @@ export const App: React.FC = () => {
         const fresh = curAsset.dataSource !== 'OFFLINE' && !!curAsset.updatedAt && Date.now() - curAsset.updatedAt < 15 * 60_000;
         if (!fresh) return p;
         const diff = p.type === 'BUY' ? curAsset.price - p.entryPrice : p.entryPrice - curAsset.price;
-        const pips = diff / (curAsset.category === 'Forex' ? 0.0001 : 0.1);
-        const pnl = pips * p.lot * (curAsset.category === 'Forex' ? 10 : 1);
+        const isJpy = p.symbol.includes('JPY');
+        // Pip: JPY = 0.01, forex khác = 0.0001, vàng/crypto = 0.1
+        const pipSize = isJpy ? 0.01 : curAsset.category === 'Forex' ? 0.0001 : 0.1;
+        const pips = diff / pipSize;
+        // $/pip/lot: forex thường = $10; JPY = 1000/giá (vì 1 pip = 1000 JPY/lot → đổi ra USD)
+        const usdPerPipPerLot = isJpy ? 1000 / curAsset.price : curAsset.category === 'Forex' ? 10 : 1;
+        const pnl = pips * p.lot * usdPerPipPerLot;
         return {
           ...p,
           currentPrice: curAsset.price,
