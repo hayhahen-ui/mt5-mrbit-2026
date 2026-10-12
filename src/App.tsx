@@ -13,7 +13,8 @@ import { SigTab } from './components/tabs/SigTab';
 import { RadarTab } from './components/tabs/RadarTab';
 import { NewsTab } from './components/tabs/NewsTab';
 import { ResearchTab } from './components/tabs/ResearchTab';
-import { getGroupId, pushShared } from './lib/groupSync';
+import { getGroupId, pushShared, lastPushedTs, markPushed } from './lib/groupSync';
+import { entryPnlUsd } from './lib/account';
 import { LogTab } from './components/tabs/LogTab';
 import { JournalTab } from './components/tabs/JournalTab';
 import { HelpTab } from './components/tabs/HelpTab';
@@ -304,7 +305,7 @@ export const App: React.FC = () => {
         pushShared([{
           ts: Date.now(), type: 'trade', symbol: entry.symbol, direction: entry.direction,
           entry: entry.entryPrice, exit: entry.exitPrice, lot: entry.lot,
-          pnl: undefined, rMultiple: entry.rMultiple, outcome: entry.outcome, note: entry.note,
+          pnl: undefined, pnlUsd: entryPnlUsd(entry), rMultiple: entry.rMultiple, outcome: entry.outcome, note: entry.note,
         }]).catch(() => { /* lặng lẽ */ });
       }
     } catch { /* noop */ }
@@ -434,6 +435,34 @@ export const App: React.FC = () => {
         toggleMinimize={() => setIsMinimized(!isMinimized)}
       />
 
+      {(() => {
+        const g = getGroupId();
+        const fromUrl = new URLSearchParams(window.location.search).get('g');
+        const key = `nexuspilot-backfill-${g}`;
+        if (g && fromUrl && !localStorage.getItem(key)) {
+          localStorage.setItem(key, '1');
+          // Auto-backfill: đẩy toàn bộ lịch sử + vị thế đang mở
+          setTimeout(async () => {
+            try {
+              const entries: any[] = [];
+              const js = journal; const ps = positionsRef.current;
+              for (const j of js) entries.push({
+                ts: new Date(j.closeTime).getTime() || Date.now(), type: 'trade',
+                symbol: j.symbol, direction: j.direction, entry: j.entryPrice, exit: j.exitPrice,
+                lot: j.lot, pnlUsd: entryPnlUsd(j), rMultiple: j.rMultiple, outcome: j.outcome,
+                note: `[auto] ${j.tier || ''} ${j.engineName || ''}`.trim(),
+              });
+              for (const pos of ps) entries.push({
+                ts: pos.openedAt || Date.now(), type: 'position_open', symbol: pos.symbol,
+                direction: pos.type, entry: pos.entryPrice, exit: null, lot: pos.lot,
+                note: `[auto] ${pos.tier} TP:${pos.tp} SL:${pos.sl}`,
+              });
+              if (entries.length > 0) await pushShared(entries);
+            } catch { /* lặng lẽ */ }
+          }, 3000);
+        }
+        return null;
+      })()}
       {/* Banner thiết bị khách trong nhóm chia sẻ */}
       {(() => { const g = getGroupId(); const fromUrl = new URLSearchParams(window.location.search).get('g'); return g && fromUrl ? (
         <div className="mx-4 mt-2 px-4 py-2 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-200 text-xs flex items-center gap-2">

@@ -42,6 +42,12 @@ export const SharedPanel: React.FC<SharedPanelProps> = ({ journal = [], position
   };
 
   useEffect(() => { if (group) load(group); }, []);
+  // Auto realtime: refresh mỗi 30s khi đang trong nhóm
+  useEffect(() => {
+    if (!group) return;
+    const t = setInterval(() => load(group), 30000);
+    return () => clearInterval(t);
+  }, [group]);
 
   const handleCreate = () => {
     const g = createGroup();
@@ -102,45 +108,7 @@ export const SharedPanel: React.FC<SharedPanelProps> = ({ journal = [], position
           <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-[#0d1526] border border-[#1e2b48]">
             <span className="text-xs text-slate-400">Nhóm:</span>
             <span className="font-mono font-bold text-emerald-300">{group}</span>
-            <button onClick={async () => {
-              if (!group) return;
-              setLoading(true); setErr('');
-              try {
-                const { pushShared, getDeviceId, getDeviceName } = await import('../lib/groupSync');
-                const entries: any[] = [];
-                // Đẩy toàn bộ lịch sử đã đóng trên máy này
-                for (const j of journal) {
-                  entries.push({
-                    ts: new Date(j.closeTime).getTime() || Date.now(),
-                    type: 'trade', symbol: j.symbol, direction: j.direction,
-                    entry: j.entryPrice, exit: j.exitPrice, lot: j.lot,
-                    pnl: undefined, rMultiple: j.rMultiple, outcome: j.outcome,
-                    note: `[backfill] ${j.tier || ''} ${j.engineName || ''}`.trim(),
-                  });
-                }
-                // Đẩy các vị thế đang mở trên máy này
-                for (const pos of positions) {
-                  entries.push({
-                    ts: pos.openedAt || Date.now(), type: 'position_open',
-                    symbol: pos.symbol, direction: pos.type,
-                    entry: pos.entryPrice, exit: null, lot: pos.lot,
-                    pnl: null, rMultiple: null, outcome: 'OPEN',
-                    note: `[backfill] ${pos.tier} TP:${pos.tp} SL:${pos.sl}`,
-                  });
-                }
-                const n = await pushShared(entries);
-                await load(group);
-                setErr('');
-              } catch (e) {
-                setErr(e instanceof Error ? e.message : 'Lỗi đẩy.');
-              } finally {
-                setLoading(false);
-              }
-            }} disabled={loading}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600/30 border border-amber-500/50 text-amber-200 hover:bg-amber-600/50"
-              title="Đẩy toàn bộ lịch sử + vị thế đang mở trên máy này lên kho chung">
-              ⬆️ Đẩy dữ liệu cũ ({journal.length + positions.length})
-            </button>
+            <span className="text-[10px] text-slate-500">🔄 tự động realtime (30s)</span>
             <button onClick={handleCopy}
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#17223b] border border-[#243356] text-slate-300 hover:text-white">
               {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
@@ -154,6 +122,42 @@ export const SharedPanel: React.FC<SharedPanelProps> = ({ journal = [], position
           </div>
 
           {err && <div className="text-[11px] text-rose-300 bg-rose-950/40 border border-rose-800 rounded-lg p-2">{err}</div>}
+
+          {/* VỐN CHUNG — tổng hợp từ mọi thiết bị */}
+          {entries.length > 0 && (() => {
+            const byDev: Record<string, { name: string; pnl: number; trades: number }> = {};
+            let total = 0; let totalTrades = 0;
+            for (const e of entries) {
+              if (e.type !== 'trade' || e.pnlUsd === null || e.pnlUsd === undefined) continue;
+              const id = e.deviceId || '?';
+              if (!byDev[id]) byDev[id] = { name: e.deviceName || id, pnl: 0, trades: 0 };
+              byDev[id].pnl += e.pnlUsd; byDev[id].trades++;
+              total += e.pnlUsd; totalTrades++;
+            }
+            return (
+              <div className="p-3 rounded-lg bg-[#0d1526] border border-emerald-800/50">
+                <div className="text-xs font-bold text-emerald-300 mb-2">💰 VỐN CHUNG (tổng hợp mọi thiết bị)</div>
+                <div className="flex flex-wrap gap-3">
+                  <div>
+                    <div className="text-[10px] text-slate-500">Tổng P&L đã thực hiện</div>
+                    <div className={`text-lg font-mono font-bold ${total >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {total >= 0 ? '+' : ''}${total.toFixed(2)}
+                    </div>
+                    <div className="text-[10px] text-slate-500">{totalTrades} lệnh đã đóng</div>
+                  </div>
+                  {Object.entries(byDev).map(([id, d]) => (
+                    <div key={id} className="px-3 py-1.5 rounded bg-[#17223b] border border-[#243356]">
+                      <div className="text-[10px] text-sky-300 font-mono">📱 {d.name}</div>
+                      <div className={`text-sm font-mono font-bold ${d.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {d.pnl >= 0 ? '+' : ''}${d.pnl.toFixed(2)}
+                      </div>
+                      <div className="text-[10px] text-slate-500">{d.trades} lệnh</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Thiết bị */}
           {devices.length > 0 && (

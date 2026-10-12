@@ -73,6 +73,7 @@ export interface SharedEntry {
   exit?: number | null;
   lot?: number | null;
   pnl?: number | null;
+  pnlUsd?: number | null;
   rMultiple?: number | null;
   outcome?: string;
   note?: string;
