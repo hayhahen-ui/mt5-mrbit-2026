@@ -129,8 +129,15 @@ export async function fetchEconomicCalendar(): Promise<NewsEvent[]> {
   for (const c of candidates) {
     try {
       const raw = await fetchJsonWithTimeout(c.url, 15000);
-      if (!Array.isArray(raw) || raw.length === 0) throw new Error('empty');
-      cachedReal = parseFF(raw);
+      // Proxy trả về {error} khi upstream lỗi — ném message thật, đừng gán thành "empty"
+      if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.error) {
+        throw new Error(`proxy: ${raw.message || raw.error}`);
+      }
+      if (!Array.isArray(raw)) throw new Error(`dữ liệu lạ (không phải mảng): ${typeof raw}`);
+      if (raw.length === 0) throw new Error('mảng rỗng từ nguồn');
+      const parsed = parseFF(raw);
+      if (parsed.length === 0) throw new Error('parse ra 0 sự kiện (lọc quá mạnh?)');
+      cachedReal = parsed;
       newsSourceName = c.label;
       newsHealth.lastOk = true;
       newsHealth.lastAt = Date.now();
