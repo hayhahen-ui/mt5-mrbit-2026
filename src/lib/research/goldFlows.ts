@@ -7,7 +7,7 @@
  *    Logic: volume > 1.5x trung bình 20 ngày + giá tăng = dòng tiền vào ETF
  * 3. Input tay — fallback khi cả 2 trên đều thiếu
  */
-import { readApiJson } from '../apiHealth';
+import {readApiJson, apiUrl} from '../apiHealth';
 
 export interface GoldFlowData {
   // WGC chính thức (tháng)
@@ -55,7 +55,7 @@ export async function fetchGoldFlows(): Promise<GoldFlowData | null> {
 
 /** Lấy GLD daily qua TwelveData proxy (cần key đã lưu). */
 export async function fetchGldDaily(tdKey: string): Promise<GoldFlowData['gld']> {
-  const r = await fetch('/api/twelvedata', {
+  const r = await fetch(apiUrl('/api/twelvedata'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: tdKey, endpoint: 'time_series', params: { symbol: 'GLD', interval: '1day', outputsize: '25' } }),

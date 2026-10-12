@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiUrl } from '../lib/apiHealth';
 import { Users, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
 import { saveMfCred, removeMfCred, mfEmailHint } from '../lib/sentiment';
 
@@ -38,7 +39,7 @@ export const MfSettings: React.FC = () => {
     setTesting(true);
     setMsg(null);
     try {
-      const r = await fetch('/api/myfxbook-outlook', {
+      const r = await fetch(apiUrl('/api/myfxbook-outlook'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: useEmail, password: usePass }),

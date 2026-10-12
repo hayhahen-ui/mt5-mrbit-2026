@@ -6,7 +6,7 @@
  *   tự đẩy lên kho chung qua /api/shared (không cần PAT).
  * - Chủ xem: kéo toàn bộ log của nhóm về, thấy giao dịch từng thiết bị.
  */
-import { readApiJson } from './apiHealth';
+import {readApiJson, apiUrl} from './apiHealth';
 
 const GROUP_LS = 'nexuspilot-share-group';   // nhóm đang tham gia (hoặc chủ)
 const DEVICE_LS = 'nexuspilot-device-id';
@@ -85,7 +85,7 @@ export interface SharedEntry {
 export async function pushShared(entries: SharedEntry[]): Promise<number> {
   const group = getGroupId();
   if (!group || entries.length === 0) return 0;
-  const r = await fetch('/api/shared', {
+  const r = await fetch(apiUrl('/api/shared'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

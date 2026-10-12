@@ -4,7 +4,7 @@
  * DTWEXBGS (USD rổ rộng), T10YIE (breakeven lạm phát).
  * Key free tại fred.stlouisfed.org → lưu localStorage (như TwelveData).
  */
-import { readApiJson } from '../apiHealth';
+import {readApiJson, apiUrl} from '../apiHealth';
 
 export type FredSeriesId = 'DGS2' | 'DGS10' | 'DFII10' | 'DTWEXBGS' | 'T10YIE';
 
@@ -48,7 +48,7 @@ export async function fetchFredSeries(id: FredSeriesId, limit = 12): Promise<Fre
   if (!key) return fail('Chưa nhập FRED API key (miễn phí tại fred.stlouisfed.org).');
 
   try {
-    const r = await fetch('/api/fred', {
+    const r = await fetch(apiUrl('/api/fred'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apikey: key, series_id: id, limit }),

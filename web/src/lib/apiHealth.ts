@@ -1,3 +1,7 @@
+/** Base URL cho API. Trên Render đặt VITE_API_URL=https://mt5-mrbit-2026-web.vercel.app */
+export const API_BASE = (import.meta as any).env?.VITE_API_URL || '';
+export const apiUrl = (path: string) => `${API_BASE}${path}`;
+
 /**
  * apiHealth.ts — Phát hiện "sai URL" ngay khi mở app.
  * Bệnh thật (11/10/2026): trình duyệt mở app từ một URL không phải production
@@ -39,7 +43,7 @@ export interface ApiOriginCheck { ok: boolean; reason?: string }
 /** Kiểm tra 1 lần khi app khởi động: /api/* có tồn tại trên origin hiện tại không. */
 export async function checkApiOrigin(): Promise<ApiOriginCheck> {
   try {
-    const r = await fetch('/api/twelvedata', {
+    const r = await fetch(apiUrl('/api/twelvedata'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',

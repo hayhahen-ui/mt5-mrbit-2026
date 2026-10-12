@@ -4,11 +4,12 @@
  */
 import { getActiveProvider, getAiKey } from './aiKeys';
 import { readApiJson } from './apiHealth';
+import { apiUrl } from './apiHealth';
 
 export interface AiChatMessage { role: 'user' | 'assistant' | 'system'; content: string }
 
 async function callProxy(payload: Record<string, unknown>) {
-  const r = await fetch('/api/ai-proxy', {
+  const r = await fetch(apiUrl('/api/ai-proxy'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
