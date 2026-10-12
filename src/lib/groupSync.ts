@@ -104,7 +104,7 @@ export async function pushShared(entries: SharedEntry[]): Promise<number> {
 export async function pullShared(group?: string): Promise<{ entries: SharedEntry[]; devices: any[] }> {
   const g = (group || getGroupId() || '').toUpperCase();
   if (!g) throw new Error('Chưa có group ID.');
-  const r = await fetch(`/api/shared?group=${encodeURIComponent(g)}&t=${Date.now()}`, { cache: 'no-store' });
+  const r = await fetch(apiUrl(`/api/shared?group=${encodeURIComponent(g)}&t=${Date.now()}`), { cache: 'no-store' });
   const d = await readApiJson(r, 'Shared');
   if (d.error) throw new Error(d.error);
   return { entries: d.entries || [], devices: d.devices || [] };
