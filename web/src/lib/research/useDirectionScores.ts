@@ -3,6 +3,25 @@ import { fetchAllFred, FredSeries, FredSeriesId } from './fred';
 import { fetchFredSnapshotOnline, pushFredSnapshot, lastFredPushAt, snapshotToSeries } from './fredStore';
 import { computeDirectionScore, DirectionResult } from './directionScore';
 import { Signal } from '../../types';
+import { getCachedOutlook, findSentiment } from '../sentiment';
+
+/** Đọc dòng vốn vàng nhập tay (localStorage). */
+export function getGoldFlow(): number | null {
+  try {
+    const v = localStorage.getItem('nexuspilot-gold-flow');
+    if (!v) return null;
+    const d = JSON.parse(v);
+    // Chỉ dùng số liệu trong 14 ngày
+    if (Date.now() - d.at > 14 * 86400000) return null;
+    return typeof d.tons === 'number' ? d.tons : null;
+  } catch { return null; }
+}
+export function setGoldFlow(tons: number | null): void {
+  try {
+    if (tons === null) localStorage.removeItem('nexuspilot-gold-flow');
+    else localStorage.setItem('nexuspilot-gold-flow', JSON.stringify({ tons, at: Date.now() }));
+  } catch { /* noop */ }
+}
 
 export const RESEARCH_SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'];
 
@@ -63,13 +82,18 @@ export function useDirectionScores(signals: Record<string, Signal>): {
   const scores = useMemo(() => {
     const out: Record<string, DirectionResult> = {};
     if (!fred) return out;
+    const outlook = getCachedOutlook();
+    const goldFlow = getGoldFlow();
     for (const sym of RESEARCH_SYMBOLS) {
       const sig = signals[sym];
+      const sent = findSentiment(outlook, sym);
       out[sym] = computeDirectionScore({
         symbol: sym,
         fred,
         priceDirection: sig?.direction || 'FLAT',
         priceScore: sig?.scoreBreakdown ? sig.scoreBreakdown.reduce((s, f: any) => s + f.points, 0) : 0,
+        sentimentLongPct: sent ? sent.longPct : null,
+        goldFlowTons: sym === 'XAUUSD' ? goldFlow : null,
       });
     }
     return out;

@@ -78,6 +78,10 @@ export interface DirectionInputs {
   priceScore: number; // 0-100 từ engine
   /** Cờ chặn: can thiệp / spread bất thường / sự kiện */
   blockers?: string[];
+  /** % long từ MyFxBook sentiment (proxy cho positioning khi chưa có COT) */
+  sentimentLongPct?: number | null;
+  /** Dòng vốn vàng thủ công (tấn, dương = vào) — nhập tay từ WGC */
+  goldFlowTons?: number | null;
 }
 
 export function computeDirectionScore(inp: DirectionInputs): DirectionResult {
@@ -86,6 +90,7 @@ export function computeDirectionScore(inp: DirectionInputs): DirectionResult {
   const blockers = inp.blockers || [];
 
   const dgs2 = inp.fred.DGS2;
+  const dgs10 = inp.fred.DGS10;
   const dfii10 = inp.fred.DFII10;
   const usw = inp.fred.DTWEXBGS;
 
@@ -127,10 +132,25 @@ export function computeDirectionScore(inp: DirectionInputs): DirectionResult {
         break;
       }
       case 'goldflows': {
+        // Ưu tiên: số liệu WGC nhập tay (tấn). Fallback: biến động DGS10 (lợi suất tăng = dòng ra khỏi vàng)
+        const tons = inp.goldFlowTons;
+        let s: number | null = null;
+        let detail = 'Chưa có API WGC tự động — nhập tay tại tab NGHIÊN CỨU (gold.org)';
+        if (tons !== null && tons !== undefined) {
+          s = tons >= 20 ? 2 : tons >= 5 ? 1 : tons <= -20 ? -2 : tons <= -5 ? -1 : 0;
+          detail = `WGC ETF flow: ${tons >= 0 ? '+' : ''}${tons} tấn/tuần (nhập tay)`;
+        } else {
+          // Proxy: DGS10 giảm = lợi suất giảm = hỗ trợ vàng
+          const d10Chg = dgs10.change;
+          if (d10Chg !== null && d10Chg !== undefined) {
+            s = scoreFromChange(d10Chg, -0.15, 0.15, false);
+            detail = `Proxy qua DGS10 (${d10Chg >= 0 ? '+' : ''}${d10Chg.toFixed(2)}pp) — chưa có số WGC`;
+          }
+        }
         groups.push({
-          ...def, score: null, evidence: 'UNVERIFIED',
-          detail: 'Chưa có API WGC/COT tự động — đọc tay tại gold.org, cftc.gov',
-          sourceIds: ['S22', 'S13'],
+          ...def, score: s,
+          evidence: s === null ? 'UNVERIFIED' : (tons !== null && tons !== undefined ? 'FACT' : 'CALCULATION'),
+          detail, sourceIds: ['S22', 'S13'],
         });
         break;
       }
@@ -148,10 +168,18 @@ export function computeDirectionScore(inp: DirectionInputs): DirectionResult {
         break;
       }
       case 'positioning': {
+        // Proxy: MyFxBook sentiment — đám đông quá lệch 1 phía = tín hiệu ngược (contrarian)
+        const lp = inp.sentimentLongPct;
+        let s: number | null = null;
+        let detail = 'Chưa có COT tự động — đọc tay tại cftc.gov (chốt T3, công bố T6)';
+        if (lp !== null && lp !== undefined) {
+          // >75% long = quá mua đám đông → -1 (ngược); <25% long = quá bán → +1
+          s = lp >= 75 ? -1 : lp <= 25 ? 1 : 0;
+          detail = `MyFxBook: ${lp.toFixed(0)}% long (contrarian)`;
+        }
         groups.push({
-          ...def, score: null, evidence: 'UNVERIFIED',
-          detail: 'Chưa có COT tự động — đọc tay tại cftc.gov (chốt T3, công bố T6)',
-          sourceIds: ['S13'],
+          ...def, score: s, evidence: s === null ? 'UNVERIFIED' : 'CALCULATION',
+          detail, sourceIds: ['S13'],
         });
         break;
       }

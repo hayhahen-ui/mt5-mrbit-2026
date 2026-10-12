@@ -9,7 +9,7 @@ import {
   FRED_SERIES_META, FredSeries, FredSeriesId,
 } from '../../lib/research/fred';
 import { computeDirectionScore, directionBadge, DirectionResult } from '../../lib/research/directionScore';
-import { useDirectionScores } from '../../lib/research/useDirectionScores';
+import { useDirectionScores, getGoldFlow, setGoldFlow } from '../../lib/research/useDirectionScores';
 import { Signal } from '../../types';
 
 interface ResearchTabProps {
