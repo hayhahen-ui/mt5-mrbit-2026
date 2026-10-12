@@ -11,6 +11,7 @@ import { OUTCOME_META } from '../../lib/journal';
 import { fmtLocalTime } from '../../lib/time';
 import { entryPnlUsd, fmtUsd } from '../../lib/account';
 import { useSharedJournal } from '../../lib/useSharedJournal';
+import { positionMargin } from '../../lib/positions';
 
 interface JournalTabProps {
   positions: Position[];
@@ -56,6 +57,8 @@ export const JournalTab: React.FC<JournalTabProps> = ({
   onCloseAllPositions,
 }) => {
   const totalPnl = positions.reduce((a, p) => a + (p.pnl || 0), 0);
+  const totalInvest = positions.reduce((a, p) => a + positionMargin(p), 0);
+  const totalEquity = totalInvest + totalPnl;
   const { group: sharedGroup, sharedOpens, sharedTrades } = useSharedJournal();
 
   const timeStopSelect = (
@@ -156,9 +159,17 @@ export const JournalTab: React.FC<JournalTabProps> = ({
             VỊ THẾ ĐANG MỞ <span className="text-slate-400 font-mono">({positions.length})</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`text-xs font-mono font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              Tổng PnL: {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
-            </span>
+            <div className="flex items-center gap-4 text-xs font-mono">
+              <span className="text-sky-300">
+                💰 Đầu tư: <strong>${totalInvest.toLocaleString('en-US', { maximumFractionDigits: 2 })}</strong>
+              </span>
+              <span className={totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                📈 Lãi/Lỗ: <strong>{totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}</strong>
+              </span>
+              <span className="text-amber-300">
+                💎 Thực có: <strong>${totalEquity.toLocaleString('en-US', { maximumFractionDigits: 2 })}</strong>
+              </span>
+            </div>
             {positions.length > 0 && (
               <button
                 onClick={() => {
@@ -185,6 +196,7 @@ export const JournalTab: React.FC<JournalTabProps> = ({
                   <th>Cặp</th>
                   <th>Chiều</th>
                   <th className="text-right">Lot</th>
+                  <th className="text-right" title="Margin = vốn ký quỹ bỏ ra (đòn bẩy 1:100)">Đầu tư</th>
                   <th className="text-right">Giá vào</th>
                   <th className="text-right">Hiện tại</th>
                   <th className="text-right">SL / TP</th>
@@ -206,6 +218,7 @@ export const JournalTab: React.FC<JournalTabProps> = ({
                         {p.type} <span className="text-slate-500">({p.tier})</span>
                       </td>
                       <td className="text-right">{p.lot}</td>
+                      <td className="text-right text-sky-300">${positionMargin(p).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="text-right">{p.entryPrice}</td>
                       <td className="text-right text-sky-300">{p.currentPrice}</td>
                       <td className="text-right text-[11px]">

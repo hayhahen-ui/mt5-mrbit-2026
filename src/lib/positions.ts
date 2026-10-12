@@ -55,3 +55,25 @@ export function clearPositions(): void {
     /* noop */
   }
 }
+
+/** Đòn bẩy mặc định của app (hiển thị 1:100 ở panel tài khoản) */
+export const LEVERAGE = 100;
+
+/**
+ * Tính $ ĐẦU TƯ (margin) cho 1 vị thế.
+ * - Forex: 1 lot = 100.000 đơn vị → margin = lot × 100.000 × giá / 100
+ * - Vàng (XAUUSD): 1 lot = 100 oz → margin = lot × 100 × giá / 100 = lot × giá
+ * - Crypto (BTCUSD): 1 lot = 1 coin → margin = lot × giá / 100
+ */
+export function positionMargin(p: Position): number {
+  const { symbol, lot, entryPrice } = p;
+  if (symbol === 'XAUUSD') return (lot * 100 * entryPrice) / LEVERAGE;
+  if (symbol === 'BTCUSD' || symbol === 'ETHUSD') return (lot * entryPrice) / LEVERAGE;
+  // Forex: mặc định 1 lot = 100.000
+  return (lot * 100000 * entryPrice) / LEVERAGE;
+}
+
+/** $ THỰC CÓ = margin + pnl */
+export function positionEquity(p: Position): number {
+  return positionMargin(p) + p.pnl;
+}
