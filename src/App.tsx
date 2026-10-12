@@ -13,6 +13,7 @@ import { SigTab } from './components/tabs/SigTab';
 import { RadarTab } from './components/tabs/RadarTab';
 import { NewsTab } from './components/tabs/NewsTab';
 import { ResearchTab } from './components/tabs/ResearchTab';
+import DataFlowTab from './components/tabs/DataFlowTab';
 import { getGroupId, pushShared, lastPushedTs, markPushed } from './lib/groupSync';
 import { entryPnlUsd } from './lib/account';
 import { LogTab } from './components/tabs/LogTab';
@@ -154,6 +155,7 @@ export const App: React.FC = () => {
         case 'C': setActiveTab('CHART'); break;
         case 'J': setActiveTab('JOURNAL'); break;
         case 'L': setActiveTab('LOG'); break;
+        case 'W': setActiveTab('FLOW'); break;
         case 'H': setActiveTab('HELP'); break;
         case 'K': setIsDockOpen((prev) => !prev); break;
         case 'M': setIsMinimized((prev) => !prev); break;
@@ -554,6 +556,7 @@ export const App: React.FC = () => {
                   onCloseAllPositions={handleCloseAllPositions}
                 />
               )}
+              {activeTab === 'FLOW' && <DataFlowTab />}
               {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} positions={positions} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} onResetAll={handleResetAll} resetMark={resetMark} />}
               {activeTab === 'HELP' && <HelpTab />}
             </div>
