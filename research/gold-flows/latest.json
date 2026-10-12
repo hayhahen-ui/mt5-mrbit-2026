@@ -1,0 +1,13 @@
+{
+ "updatedAt": "2026-10-12T03:01:13.423832+00:00",
+ "wgc": {
+  "month": "2026-09",
+  "flowTons": 67.3,
+  "totalTons": 4256,
+  "source": "WGC (b\u00e1o c\u00e1o T9/2026)",
+  "updatedAt": "2026-10-12T03:01:13.423855+00:00",
+  "note": "Q3/2026: +211 t\u1ea5n (+$31B), k\u1ef7 l\u1ee5c. B\u1eafc M\u1ef9 +27.7 t\u1ea5n T9."
+ },
+ "gld": null,
+ "note": "WGC h\u00e0ng th\u00e1ng (tay) + GLD proxy h\u00e0ng ng\u00e0y (app t\u1ef1 \u0111\u1ea9y)"
+}
