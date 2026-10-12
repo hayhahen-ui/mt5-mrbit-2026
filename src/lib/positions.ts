@@ -12,6 +12,8 @@ export const DEFAULT_AUTO_CLOSE: AutoCloseConfig = {
   tp: true,
   sl: true,
   timeStopMin: null,
+  tpUsd: null,
+  slUsd: null,
 };
 
 /** Đọc vị thế đã lưu — lọc bản ghi hỏng, reset giá trị live về mặc định an toàn */

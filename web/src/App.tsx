@@ -44,6 +44,8 @@ function loadDefaultAuto(): AutoCloseConfig {
       tp: v.tp !== false,
       sl: v.sl !== false,
       timeStopMin: typeof v.timeStopMin === 'number' ? v.timeStopMin : null,
+      tpUsd: typeof v.tpUsd === 'number' && v.tpUsd > 0 ? v.tpUsd : null,
+      slUsd: typeof v.slUsd === 'number' && v.slUsd > 0 ? v.slUsd : null,
     };
   } catch {
     return { ...DEFAULT_AUTO };
@@ -347,7 +349,12 @@ export const App: React.FC = () => {
       p.currentPrice = px; // đồng bộ giá thoát cho bản ghi sổ
       const hitTp = p.type === 'BUY' ? px >= p.tp : px <= p.tp;
       const hitSl = p.type === 'BUY' ? px <= p.sl : px >= p.sl;
-      if (ac.tp && hitTp) {
+      // ĂN NON: lời đạt ngưỡng $ → đóng ngay (trước cả TP giá)
+      if (ac.tpUsd != null && ac.tpUsd > 0 && (p.pnl || 0) >= ac.tpUsd) {
+        handleCloseWithOutcome(p.id, 'TP', 'auto', `ăn-non +$${ac.tpUsd}`);
+      } else if (ac.slUsd != null && ac.slUsd > 0 && (p.pnl || 0) <= -ac.slUsd) {
+        handleCloseWithOutcome(p.id, 'SL', 'auto', `cắt-lỗ-sớm -$${ac.slUsd}`);
+      } else if (ac.tp && hitTp) {
         handleCloseWithOutcome(p.id, 'TP', 'auto', 'auto-TP');
       } else if (ac.sl && hitSl) {
         handleCloseWithOutcome(p.id, 'SL', 'auto', 'auto-SL');

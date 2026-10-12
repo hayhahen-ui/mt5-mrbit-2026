@@ -147,6 +147,30 @@ export const JournalTab: React.FC<JournalTabProps> = ({
                   onDefaultAutoChange({ ...defaultAuto, timeStopMin: v })
                 )}
               </span>
+              <label className="flex items-center gap-1 text-emerald-300 font-mono" title="Ăn non: lời đạt $ này → tự đóng ngay">
+                🤑 +$
+                <input
+                  type="number" min={0} step={1} placeholder="5"
+                  value={defaultAuto.tpUsd ?? ''}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    onDefaultAutoChange({ ...defaultAuto, tpUsd: v > 0 ? v : null });
+                  }}
+                  className="w-14 px-1.5 py-1 rounded bg-[#0b0f19] border border-emerald-500/30 text-emerald-200 text-[11px] font-mono"
+                />
+              </label>
+              <label className="flex items-center gap-1 text-rose-300 font-mono" title="Cắt lỗ sớm: lỗ đạt $ này → tự đóng ngay">
+                😱 -$
+                <input
+                  type="number" min={0} step={1} placeholder="5"
+                  value={defaultAuto.slUsd ?? ''}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    onDefaultAutoChange({ ...defaultAuto, slUsd: v > 0 ? v : null });
+                  }}
+                  className="w-14 px-1.5 py-1 rounded bg-[#0b0f19] border border-rose-500/30 text-rose-200 text-[11px] font-mono"
+                />
+              </label>
             </>
           )}
         </div>

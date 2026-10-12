@@ -24,6 +24,8 @@ export interface AutoCloseConfig {
   tp: boolean; // tự chốt khi chạm TP
   sl: boolean; // tự cắt khi chạm SL
   timeStopMin: number | null; // time-stop: null = không dùng
+  tpUsd: number | null; // ĂN NON: lời đạt $ này → tự đóng (null = tắt)
+  slUsd: number | null; // CẮT LỖ SỚM: lỗ đạt $ này → tự đóng (null = tắt)
 }
 
 export const TIME_STOP_OPTIONS: { label: string; minutes: number }[] = [
