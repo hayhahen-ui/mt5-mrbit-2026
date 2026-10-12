@@ -12,6 +12,7 @@ import { CtxTab } from './components/tabs/CtxTab';
 import { SigTab } from './components/tabs/SigTab';
 import { RadarTab } from './components/tabs/RadarTab';
 import { NewsTab } from './components/tabs/NewsTab';
+import { ResearchTab } from './components/tabs/ResearchTab';
 import { LogTab } from './components/tabs/LogTab';
 import { JournalTab } from './components/tabs/JournalTab';
 import { HelpTab } from './components/tabs/HelpTab';
@@ -146,6 +147,7 @@ export const App: React.FC = () => {
         case 'X': setActiveTab('CTX'); break;
         case 'S': setActiveTab('SIG'); break;
         case 'D': setActiveTab('RADAR'); break;
+        case 'R': setActiveTab('RESEARCH'); break;
         case 'N': setActiveTab('NEWS'); break;
         case 'C': setActiveTab('CHART'); break;
         case 'J': setActiveTab('JOURNAL'); break;
@@ -480,6 +482,7 @@ export const App: React.FC = () => {
                 />
               )}
               {activeTab === 'NEWS' && <NewsTab newsEvents={news} newsSource={newsSource} />}
+              {activeTab === 'RESEARCH' && <ResearchTab signals={signals} />}
               {activeTab === 'CHART' && <ChartPanel assets={assets} journal={journal} initialSymbol={selectedAsset.symbol} news={news} />}
               {activeTab === 'JOURNAL' && (
                 <JournalTab

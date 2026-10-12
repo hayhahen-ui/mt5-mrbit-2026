@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Asset, DataSource, Signal, MarketSnapshot } from '../../types';
 import { Radar, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronDown, ScanSearch } from 'lucide-react';
 import { totalScore, maxScore } from '../../lib/scoring';
+import { useDirectionScores, RESEARCH_SYMBOLS } from '../../lib/research/useDirectionScores';
+import { directionBadge } from '../../lib/research/directionScore';
 
 interface RadarTabProps {
   assets: Asset[];
@@ -51,6 +53,7 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, snapshots, 
   }, [assets, sortKey, catFilter]);
 
   const signalCount = assets.filter((a) => a.signalDir !== 'FLAT').length;
+  const { scores: dirScores, fredLoaded } = useDirectionScores(signals);
 
   return (
     <div className="space-y-4">
@@ -160,6 +163,23 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, snapshots, 
                   </span>
                 </div>
 
+                {/* Điểm định hướng vĩ mô (Blueprint §9.2) — chỉ 4 mã nghiên cứu */}
+                {RESEARCH_SYMBOLS.includes(asset.symbol) && (
+                  <div className="flex items-center justify-between text-[10px] pt-1.5 font-mono">
+                    <span className="text-slate-500" title="Điểm định hướng từ yếu tố vĩ mô (FRED) + cấu trúc giá">Vĩ mô:</span>
+                    {dirScores[asset.symbol] ? (
+                      <span className={`font-bold px-1.5 py-0.5 rounded ${
+                        dirScores[asset.symbol].bias === 'TĂNG' ? 'bg-emerald-950 text-emerald-400'
+                        : dirScores[asset.symbol].bias === 'GIẢM' ? 'bg-rose-950 text-rose-400'
+                        : 'bg-[#17223b] text-slate-400'
+                      }`} title={`Bao phủ ${dirScores[asset.symbol].coveragePct}% — xem tab NGHIÊN CỨU`}>
+                        {directionBadge(dirScores[asset.symbol])}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">{fredLoaded ? '—' : '⏳'}</span>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[11px] pt-2 border-t border-[#1e2b48] font-mono">
                   <span className="text-slate-400">Spread: {asset.spread} p</span>
                   <div className="flex items-center gap-1.5">
