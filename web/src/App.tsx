@@ -221,9 +221,16 @@ export const App: React.FC = () => {
 
   // 1-Click Order Execution: 3-Tier Split
   const handleExecuteTrade = (sig: Signal, totalLot: number) => {
-    const lot1 = Number((totalLot * 0.5).toFixed(2));
-    const lot2 = Number((totalLot * 0.3).toFixed(2));
-    const lot3 = Number((totalLot - lot1 - lot2).toFixed(2));
+    // Chia 3 tầng nhưng mỗi tầng tối thiểu 0.01; nếu totalLot < 0.03 thì dồn hết vào TP1
+    let lot1: number, lot2: number, lot3: number;
+    if (totalLot < 0.03) {
+      lot1 = Number(totalLot.toFixed(2)); lot2 = 0; lot3 = 0;
+    } else {
+      lot1 = Math.max(0.01, Number((totalLot * 0.5).toFixed(2)));
+      lot2 = Math.max(0.01, Number((totalLot * 0.3).toFixed(2)));
+      lot3 = Number(Math.max(0, totalLot - lot1 - lot2).toFixed(2));
+      if (lot3 < 0.01) { lot1 = Number((lot1 + lot3).toFixed(2)); lot3 = 0; }
+    }
 
     const nowStr = new Date().toLocaleTimeString('vi-VN');
     const sigScore = totalScore(sig.scoreBreakdown);
@@ -236,11 +243,13 @@ export const App: React.FC = () => {
       lot: number,
       tp: number,
       idx: number
-    ): Position => ({
-      id: `POS-${Date.now()}-${idx}`,
+    ): Position | null => {
+      if (lot < 0.01) return null; // không tạo lệnh ma
+      return {
+      id: `POS-${Date.now()}-${idx}-${Math.random().toString(36).slice(2,7)}`,
       symbol: sig.symbol,
       type: sig.direction as 'BUY' | 'SELL',
-      lot: lot > 0 ? lot : 0.01,
+      lot,
       entryPrice: sig.entryPrice,
       currentPrice: sig.entryPrice,
       sl: sig.stopLoss,
@@ -259,13 +268,13 @@ export const App: React.FC = () => {
       marketSnapshot: snap,
       openedAt: Date.now(),
       autoClose: { ...defaultAuto },
-    });
+    };};
 
-    const newPositions: Position[] = [
+        const newPositions: Position[] = [
       mkPos('TP1', lot1, sig.tp1, 1),
       mkPos('TP2', lot2, sig.tp2, 2),
       mkPos('TP3', lot3, sig.tp3, 3)
-    ];
+    ].filter((x): x is Position => x !== null);
 
     setPositions((prev) => [...prev, ...newPositions]);
     // Đẩy lên kho chia sẻ khi MỞ lệnh (nếu đang trong nhóm)
@@ -301,8 +310,11 @@ export const App: React.FC = () => {
     if (!pos) return;
     const asset = assets.find((a) => a.symbol === pos.symbol);
     const digits = asset ? asset.digits : 2;
+    // Ăn-non/cắt-lỗ-sớm: closeNote chứa 'ăn-non'/'cắt-lỗ-sớm' → dùng giá hiện tại, KHÔNG dùng pos.tp/pos.sl
+    const isEarly = closeNote && (closeNote.includes('ăn-non') || closeNote.includes('cắt-lỗ-sớm'));
     const exitPrice =
-      outcome === 'TP' ? pos.tp
+      isEarly ? pos.currentPrice
+      : outcome === 'TP' ? pos.tp
       : outcome === 'SL' ? pos.sl
       : outcome === 'BE' ? pos.entryPrice
       : pos.currentPrice;
@@ -356,7 +368,7 @@ export const App: React.FC = () => {
       const diffLive = p.type === 'BUY' ? px - p.entryPrice : p.entryPrice - px;
       const isJpyLive = p.symbol.includes('JPY');
       const pipSizeLive = isJpyLive ? 0.01 : cur.category === 'Forex' ? 0.0001 : 0.1;
-      const usdPerPipLive = isJpyLive ? 1000 / px : cur.category === 'Forex' ? 10 : 1;
+      const usdPerPipLive = isJpyLive ? 1000 / px : cur.category === 'Forex' ? 10 : 0.1; // crypto: 1 pip = $0.10/lot
       const pnlLive = (diffLive / pipSizeLive) * p.lot * usdPerPipLive;
       p.pnl = Number(pnlLive.toFixed(2));
       const hitTp = p.type === 'BUY' ? px >= p.tp : px <= p.tp;

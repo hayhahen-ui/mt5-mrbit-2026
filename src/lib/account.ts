@@ -18,11 +18,16 @@ export function isForexSymbol(symbol: string): boolean {
 }
 
 /** $/pip cho 1 lot — khớp công thức floating pnl trong App */
-export function usdPerPipPerLot(symbol: string): number {
-  return isForexSymbol(symbol) ? 10 : 1;
+/** $/pip cho 1 lot — khớp công thức floating pnl trong App */
+export function usdPerPipPerLot(symbol: string, price?: number): number {
+  if (symbol.includes('JPY')) return price && price > 0 ? 1000 / price : 6.3; // ~1000/158
+  if (isForexSymbol(symbol)) return 10;
+  return 0.1; // crypto/metals: 1 pip (0.1 giá) = $0.10/lot; XAUUSD riêng tính theo oz
 }
 
+/** XAUUSD đặc biệt: 1 lot = 100 oz → $/pip = $10 (pip 0.1 = $1/oz × 100) */
 export function pipSizeOf(symbol: string): number {
+  if (symbol.includes('JPY')) return 0.01;
   return isForexSymbol(symbol) ? 0.0001 : 0.1;
 }
 
@@ -30,7 +35,9 @@ export function pipSizeOf(symbol: string): number {
 export function entryPnlUsd(e: JournalEntry): number {
   const diff = e.direction === 'BUY' ? e.exitPrice - e.entryPrice : e.entryPrice - e.exitPrice;
   const pips = diff / pipSizeOf(e.symbol);
-  return Number((pips * e.lot * usdPerPipPerLot(e.symbol)).toFixed(2));
+  // XAUUSD: P&L = diff($/oz) × 100 oz × lot
+  if (e.symbol === 'XAUUSD') return Number((diff * 100 * e.lot).toFixed(2));
+  return Number((pips * e.lot * usdPerPipPerLot(e.symbol, e.exitPrice)).toFixed(2));
 }
 
 /** Tổng P&L đã thực hiện từ sổ */

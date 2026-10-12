@@ -61,7 +61,7 @@ export function entryFromPosition(
   closeNote?: string
 ): JournalEntry {
   const rMultiple = outcome === 'BE' ? 0 : calcRMultiple(pos.type, pos.entryPrice, pos.sl, exitPrice);
-  const pipSize = 0.0001; // chuẩn hoá pips hiển thị
+  const pipSize = pos.symbol.includes('JPY') ? 0.01 : 0.0001; // JPY: 0.01, còn lại chuẩn hoá (crypto/metals hiển thị theo pip forex)
   const pips = Number((((pos.type === 'BUY' ? exitPrice - pos.entryPrice : pos.entryPrice - exitPrice)) / pipSize).toFixed(1));
   const now = new Date().toISOString();
   return {

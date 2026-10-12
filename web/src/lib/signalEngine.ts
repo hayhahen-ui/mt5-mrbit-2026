@@ -244,7 +244,7 @@ export function evaluateSignal(
   const tp1 = isBuy ? entry + riskDist : entry - riskDist;
   const tp2 = isBuy ? entry + riskDist * 2 : entry - riskDist * 2;
   const tp3 = isBuy ? entry + riskDist * 3 : entry - riskDist * 3;
-  const pipSize = asset.category === 'Forex' ? 0.0001 : asset.category === 'Metals' ? 0.1 : 1;
+  const pipSize = asset.symbol.includes('JPY') ? 0.01 : asset.category === 'Forex' ? 0.0001 : 0.1;
   const toPips = (d: number) => Number((Math.abs(d) / pipSize).toFixed(1));
   const r = (x: number) => Number(x.toFixed(asset.digits));
 
@@ -306,4 +306,3 @@ export function evaluateSignal(
 
   return { signal, snapshot, rawFeatures };
 }
-// deploy retry 20261012034243
