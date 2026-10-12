@@ -9,15 +9,44 @@
  */
 import {readApiJson, apiUrl} from '../apiHealth';
 
+export interface WgcEtfMonthly {
+  period: string; published_on: string;
+  holdings_t: number | null;      // STOCK — tồn lượng cuối kỳ
+  demand_t: number | null;        // FLOW — thay đổi lượng
+  net_flow_usd_bn: number | null; // FLOW — dòng vốn ròng USD
+  aum_usd_bn: number | null;      // VALUE
+  aum_change_pct: number | null;
+  q3_net_flow_usd_bn?: number | null;
+  source: string; source_url?: string; note?: string;
+}
+export interface WgcGdtQuarterly {
+  period: string; published_on: string;
+  total_demand_t: number | null;
+  demand_ex_otc_t: number | null;
+  otc_other_t: number | null;
+  cb_net_t: number | null;        // mua ròng NHTW
+  etf_demand_t: number | null;     // cầu ETF quý (âm = bán ròng)
+  source: string; source_url?: string; note?: string;
+}
+export interface ImfCofer {
+  period: string; published_on: string;
+  total_reserves_usd_tn: number | null;
+  usd_share_pct: number | null; usd_share_change_pp: number | null;
+  eur_share_pct: number | null; eur_share_change_pp: number | null;
+  source: string; note?: string;
+}
 export interface GoldFlowData {
-  // WGC chính thức (tháng)
+  // WGC chính thức (tháng) — schema v2 theo WGC_XAU_Forex_Data_Analysis_Module.md
   wgc: {
-    month: string; // YYYY-MM
-    flowTons: number | null; // tấn, dương = vào
-    totalTons: number | null;
+    month: string; // YYYY-MM (tương thích v1)
+    flowTons: number | null; // tấn, dương = vào (tương thích v1)
+    totalTons: number | null; // tương thích v1
     source: string;
     updatedAt: string;
+    etf_monthly?: WgcEtfMonthly | null;
+    gdt_quarterly?: WgcGdtQuarterly | null;
   } | null;
+  imf_cofer?: ImfCofer | null;
   // GLD proxy (ngày)
   gld: {
     date: string;
@@ -42,7 +71,7 @@ export async function fetchGoldFlows(): Promise<GoldFlowData | null> {
     }
   } catch { /* noop */ }
   try {
-    const r = await fetch(`/api/gold-flows?t=${Date.now()}`, { cache: 'no-store' });
+    const r = await fetch(apiUrl(`/api/gold-flows?t=${Date.now()}`), { cache: 'no-store' });
     const d = await readApiJson(r, 'Dòng vốn vàng');
     if (d.error) return null;
     const data: GoldFlowData = { wgc: d.wgc || null, gld: d.gld || null };

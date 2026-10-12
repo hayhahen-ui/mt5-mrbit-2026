@@ -11,8 +11,97 @@ import {
 import { computeDirectionScore, directionBadge, DirectionResult } from '../../lib/research/directionScore';
 import { useDirectionScores, getGoldFlow, setGoldFlow } from '../../lib/research/useDirectionScores';
 import { Signal } from '../../types';
+import { fetchGoldFlows, GoldFlowData } from '../../lib/research/goldFlows';
 
 const DIGEST_URL = 'https://raw.githubusercontent.com/hayhahen-ui/mt5-mrbit-2026/data/research/digest/latest.json';
+
+/** Panel dữ liệu WGC chi tiết theo WGC_XAU_Forex_Data_Analysis_Module.md §2 */
+function WgcPanel() {
+  const [d, setD] = useState<GoldFlowData | null>(null);
+  useEffect(() => { fetchGoldFlows().then(setD).catch(() => {}); }, []);
+  if (!d?.wgc?.etf_monthly) return (
+    <div className="glass-panel p-4 text-[11px] text-slate-500">🏦 Đang tải dữ liệu WGC từ kho GitHub…</div>
+  );
+  const etf = d.wgc.etf_monthly;
+  const gdt = d.wgc.gdt_quarterly;
+  const cofer = d.imf_cofer;
+  return (
+    <div className="space-y-3">
+      {/* ETF tháng */}
+      <div className="glass-panel p-4 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-xs text-slate-100">🏦 WGC ETF VÀNG — tháng {etf.period}</span>
+          <span className="text-[10px] text-slate-500">công bố {etf.published_on}</span>
+          <a href={etf.source_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-400 hover:underline">nguồn WGC ↗</a>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="p-2.5 rounded-lg bg-[#0b0f19] border border-[#1e2b48]">
+            <div className="text-[9px] text-slate-500">TỒN LƯỢNG (STOCK)</div>
+            <div className="text-sm font-mono font-bold text-slate-100">{etf.holdings_t?.toLocaleString()} t</div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-[#0b0f19] border border-[#1e2b48]">
+            <div className="text-[9px] text-slate-500">DÒNG LƯỢNG (FLOW)</div>
+            <div className={`text-sm font-mono font-bold ${(etf.demand_t||0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {(etf.demand_t||0) >= 0 ? '+' : ''}{etf.demand_t} t
+            </div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-[#0b0f19] border border-[#1e2b48]">
+            <div className="text-[9px] text-slate-500">DÒNG VỐN USD (FLOW)</div>
+            <div className={`text-sm font-mono font-bold ${(etf.net_flow_usd_bn||0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {(etf.net_flow_usd_bn||0) >= 0 ? '+' : ''}${etf.net_flow_usd_bn} tỷ
+            </div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-[#0b0f19] border border-[#1e2b48]">
+            <div className="text-[9px] text-slate-500">AUM (VALUE)</div>
+            <div className="text-sm font-mono font-bold text-slate-100">${etf.aum_usd_bn} tỷ</div>
+            <div className={`text-[10px] font-mono ${(etf.aum_change_pct||0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{etf.aum_change_pct}% MoM</div>
+          </div>
+        </div>
+        {etf.note && <div className="text-[11px] text-amber-300/80">⚠️ {etf.note}</div>}
+      </div>
+      {/* GDT quý */}
+      {gdt && (
+        <div className="glass-panel p-4 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-xs text-slate-100">📊 CUNG–CẦU VÀNG — {gdt.period}</span>
+            <span className="text-[10px] text-slate-500">công bố {gdt.published_on}</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            {[
+              ['Tổng cầu', gdt.total_demand_t, 't'],
+              ['Chưa gồm OTC', gdt.demand_ex_otc_t, 't'],
+              ['OTC & khác', gdt.otc_other_t, 't'],
+              ['NHTW mua ròng', gdt.cb_net_t, 't'],
+              ['ETF quý', gdt.etf_demand_t, 't'],
+            ].map(([label, v, unit]) => (
+              <div key={label as string} className="p-2.5 rounded-lg bg-[#0b0f19] border border-[#1e2b48]">
+                <div className="text-[9px] text-slate-500">{label}</div>
+                <div className={`text-sm font-mono font-bold ${(v as number) >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
+                  {(v as number) >= 0 ? '+' : ''}{v} {unit}
+                </div>
+              </div>
+            ))}
+          </div>
+          {gdt.note && <div className="text-[11px] text-amber-300/80">⚠️ {gdt.note}</div>}
+        </div>
+      )}
+      {/* IMF COFER */}
+      {cofer && (
+        <div className="glass-panel p-4 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-xs text-slate-100">🌍 IMF COFER — {cofer.period}</span>
+            <span className="text-[10px] text-slate-500">công bố {cofer.published_on} · tổng dự trữ ${cofer.total_reserves_usd_tn} nghìn tỷ</span>
+          </div>
+          <div className="flex gap-4 text-[11px] font-mono">
+            <span>USD: <strong className="text-slate-200">{cofer.usd_share_pct}%</strong> <span className="text-rose-400">({cofer.usd_share_change_pp}pp)</span></span>
+            <span>EUR: <strong className="text-slate-200">{cofer.eur_share_pct}%</strong> <span className="text-emerald-400">(+{cofer.eur_share_change_pp}pp)</span></span>
+          </div>
+          {cofer.note && <div className="text-[11px] text-amber-300/80">⚠️ {cofer.note}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DigestPanel() {
   const [d, setD] = useState<any>(null);
@@ -71,7 +160,7 @@ function EvidenceTag({ label }: { label: EvidenceLabel }) {
 }
 
 export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
-  const [section, setSection] = useState<'factors' | 'digest' | 'sources'>('factors');
+  const [section, setSection] = useState<'factors' | 'digest' | 'wgc' | 'sources'>('factors');
   const [symbol, setSymbol] = useState('EURUSD');
   const [tierFilter, setTierFilter] = useState<SourceTier | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
@@ -138,7 +227,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
           </div>
         </div>
         <div className="flex gap-1.5">
-          {([['factors', '📊 Yếu tố & Điểm'], ['digest', '📋 Bản tin hàng ngày'], ['sources', '📚 Truy tìm nguồn']] as const).map(([k, label]) => (
+          {([['factors', '📊 Yếu tố & Điểm'], ['digest', '📋 Bản tin hàng ngày'], ['wgc', '🏦 Dữ liệu WGC'], ['sources', '📚 Truy tìm nguồn']] as const).map(([k, label]) => (
             <button key={k} onClick={() => setSection(k)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
                 section === k ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-[#0b0f19] text-slate-400 border-[#1e2b48] hover:text-white'
@@ -304,6 +393,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
       )}
 
       {section === 'digest' && <DigestPanel />}
+
+      {section === 'wgc' && <WgcPanel />}
 
       {section === 'sources' && (
         <div className="glass-panel p-4 space-y-3">
