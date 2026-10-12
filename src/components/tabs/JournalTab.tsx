@@ -10,6 +10,7 @@ import {
 import { OUTCOME_META } from '../../lib/journal';
 import { fmtLocalTime } from '../../lib/time';
 import { entryPnlUsd, fmtUsd } from '../../lib/account';
+import { useSharedJournal } from '../../lib/useSharedJournal';
 
 interface JournalTabProps {
   positions: Position[];
@@ -55,6 +56,7 @@ export const JournalTab: React.FC<JournalTabProps> = ({
   onCloseAllPositions,
 }) => {
   const totalPnl = positions.reduce((a, p) => a + (p.pnl || 0), 0);
+  const { group: sharedGroup, sharedOpens, sharedTrades } = useSharedJournal();
 
   const timeStopSelect = (
     value: number | null | undefined,
@@ -313,6 +315,42 @@ export const JournalTab: React.FC<JournalTabProps> = ({
         )}
       </div>
 
+      {/* Vị thế đang mở từ thiết bị khác (chỉ xem) */}
+      {sharedGroup && sharedOpens.length > 0 && (
+        <div className="glass-panel p-5 space-y-3 border-emerald-800/40">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-bold text-emerald-300">
+              📱 VỊ THẾ ĐANG MỞ — THIẾT BỊ KHÁC
+            </div>
+            <span className="text-xs text-slate-400 font-mono">{sharedOpens.length} vị thế · {sharedGroup}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-[#1e2b48] text-slate-400 font-mono">
+                  <th className="py-2">Thiết bị</th><th>Mã</th><th>Chiều</th>
+                  <th className="text-right">Lot</th><th className="text-right">Giá vào</th><th>Ghi chú</th><th>Thời gian</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1e2b48] font-mono">
+                {sharedOpens.map((e, i) => (
+                  <tr key={`so-${i}`} className="hover:bg-[#17223b]/40 opacity-80">
+                    <td className="py-2 text-sky-300 text-[11px]">📱 {e.deviceName}</td>
+                    <td className="font-bold text-slate-200">{e.symbol}</td>
+                    <td className={e.direction === 'BUY' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{e.direction}</td>
+                    <td className="text-right">{e.lot}</td>
+                    <td className="text-right">{e.entry}</td>
+                    <td className="text-[11px] text-slate-500">{e.note}</td>
+                    <td className="text-slate-500 text-[11px]">{new Date(e.ts).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-[10px] text-slate-500 italic">Chỉ xem — không thể đóng/sửa vị thế của thiết bị khác.</div>
+        </div>
+      )}
+
       {/* Lịch sử lệnh đã đóng */}
       <div className="glass-panel p-5 space-y-3">
         <div className="flex items-center justify-between">
@@ -366,6 +404,28 @@ export const JournalTab: React.FC<JournalTabProps> = ({
                     <td className={`text-right font-bold ${usd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {usd >= 0 ? '+' : '-'}{fmtUsd(Math.abs(usd))}
                     </td>); })()}
+                  </tr>
+                ))}
+                {/* Lệnh đã đóng từ thiết bị khác */}
+                {sharedTrades.map((e, i) => (
+                  <tr key={`st-${i}`} className="hover:bg-[#17223b]/40 opacity-80 bg-emerald-950/10">
+                    <td className="py-2 text-slate-400 text-[11px]">
+                      {new Date(e.ts).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      <div className="text-sky-400 text-[10px]">📱 {e.deviceName}</div>
+                    </td>
+                    <td className="font-bold text-slate-200">{e.symbol}</td>
+                    <td className={e.direction === 'BUY' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{e.direction}</td>
+                    <td className="text-right">{e.lot ?? '—'}</td>
+                    <td className="text-right">{e.entry ?? '—'}</td>
+                    <td className="text-right">{e.exit ?? '—'}</td>
+                    <td className="text-slate-400">{e.outcome || '—'}</td>
+                    <td className="text-[11px] text-slate-500">thiết bị khác</td>
+                    <td className={`text-right font-bold ${(e.rMultiple || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {e.rMultiple !== null && e.rMultiple !== undefined ? `${e.rMultiple >= 0 ? '+' : ''}${e.rMultiple}R` : '—'}
+                    </td>
+                    <td className={`text-right font-bold ${(e.pnlUsd || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {e.pnlUsd !== null && e.pnlUsd !== undefined ? `${e.pnlUsd >= 0 ? '+' : '-'}$${Math.abs(e.pnlUsd).toFixed(2)}` : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
