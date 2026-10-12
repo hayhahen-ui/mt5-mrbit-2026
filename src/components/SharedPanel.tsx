@@ -11,7 +11,12 @@ import {
  * - Chủ: tạo nhóm → copy link gửi → xem giao dịch mọi thiết bị.
  * - Khách (mở link ?g=): tự join, giao dịch tự đẩy lên kho chung.
  */
-export const SharedPanel: React.FC = () => {
+interface SharedPanelProps {
+  journal?: any[];
+  positions?: any[];
+}
+
+export const SharedPanel: React.FC<SharedPanelProps> = ({ journal = [], positions = [] }) => {
   const [group, setGroup] = useState<string | null>(getGroupId());
   const [deviceName, setDName] = useState(getDeviceName() || getDeviceId());
   const [copied, setCopied] = useState(false);
@@ -97,6 +102,45 @@ export const SharedPanel: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-[#0d1526] border border-[#1e2b48]">
             <span className="text-xs text-slate-400">Nhóm:</span>
             <span className="font-mono font-bold text-emerald-300">{group}</span>
+            <button onClick={async () => {
+              if (!group) return;
+              setLoading(true); setErr('');
+              try {
+                const { pushShared, getDeviceId, getDeviceName } = await import('../lib/groupSync');
+                const entries: any[] = [];
+                // Đẩy toàn bộ lịch sử đã đóng trên máy này
+                for (const j of journal) {
+                  entries.push({
+                    ts: new Date(j.closeTime).getTime() || Date.now(),
+                    type: 'trade', symbol: j.symbol, direction: j.direction,
+                    entry: j.entryPrice, exit: j.exitPrice, lot: j.lot,
+                    pnl: undefined, rMultiple: j.rMultiple, outcome: j.outcome,
+                    note: `[backfill] ${j.tier || ''} ${j.engineName || ''}`.trim(),
+                  });
+                }
+                // Đẩy các vị thế đang mở trên máy này
+                for (const pos of positions) {
+                  entries.push({
+                    ts: pos.openedAt || Date.now(), type: 'position_open',
+                    symbol: pos.symbol, direction: pos.type,
+                    entry: pos.entryPrice, exit: null, lot: pos.lot,
+                    pnl: null, rMultiple: null, outcome: 'OPEN',
+                    note: `[backfill] ${pos.tier} TP:${pos.tp} SL:${pos.sl}`,
+                  });
+                }
+                const n = await pushShared(entries);
+                await load(group);
+                setErr('');
+              } catch (e) {
+                setErr(e instanceof Error ? e.message : 'Lỗi đẩy.');
+              } finally {
+                setLoading(false);
+              }
+            }} disabled={loading}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600/30 border border-amber-500/50 text-amber-200 hover:bg-amber-600/50"
+              title="Đẩy toàn bộ lịch sử + vị thế đang mở trên máy này lên kho chung">
+              ⬆️ Đẩy dữ liệu cũ ({journal.length + positions.length})
+            </button>
             <button onClick={handleCopy}
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#17223b] border border-[#243356] text-slate-300 hover:text-white">
               {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}

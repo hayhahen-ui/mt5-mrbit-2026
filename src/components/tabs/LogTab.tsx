@@ -10,6 +10,7 @@ import { SharedPanel } from '../SharedPanel';
 
 interface LogTabProps {
   journal: JournalEntry[];
+  positions?: any[];
   onClearJournal: () => void;
   onClearKaizen: () => void;
   onResetAll: () => void;
@@ -18,7 +19,7 @@ interface LogTabProps {
 
 type RangeKey = '7D' | '30D' | 'ALL';
 
-export const LogTab: React.FC<LogTabProps> = ({ journal, onClearJournal, onClearKaizen, onResetAll, resetMark }) => {
+export const LogTab: React.FC<LogTabProps> = ({ journal, positions = [], onClearJournal, onClearKaizen, onResetAll, resetMark }) => {
   const [range, setRange] = useState<RangeKey>('ALL');
   const stats = calcJournalStats(journal);
   const curve = equityCurve(journal);
@@ -106,7 +107,7 @@ ${rows}
 
   return (
     <div className="space-y-4">
-      <SharedPanel />
+      <SharedPanel journal={journal} positions={positions} />
       {/* REPORT — bộ lọc + 4 thẻ kiểu EA Autopilot */}
       <div className="glass-panel p-5 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">

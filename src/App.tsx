@@ -525,7 +525,7 @@ export const App: React.FC = () => {
                   onCloseAllPositions={handleCloseAllPositions}
                 />
               )}
-              {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} onResetAll={handleResetAll} resetMark={resetMark} />}
+              {activeTab === 'LOG' && <LogTab key={`log-${lastUpdated}-${journal.length}`} journal={journal} positions={positions} onClearJournal={handleClearJournal} onClearKaizen={() => { clearKaizen(); showToast('Đã xóa nhật ký Kaizen.'); }} onResetAll={handleResetAll} resetMark={resetMark} />}
               {activeTab === 'HELP' && <HelpTab />}
             </div>
           )}
