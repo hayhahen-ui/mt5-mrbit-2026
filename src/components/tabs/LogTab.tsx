@@ -6,6 +6,7 @@ import { analyzeKaizen, analyzeKaizenFull } from '../../lib/kaizen';
 import { KaizenAnalysis } from '../../types';
 import { fmtLocalTime } from '../../lib/time';
 import { entryPnlUsd, fmtUsd, realizedPnlUsd } from '../../lib/account';
+import { SharedPanel } from '../SharedPanel';
 
 interface LogTabProps {
   journal: JournalEntry[];
@@ -105,6 +106,7 @@ ${rows}
 
   return (
     <div className="space-y-4">
+      <SharedPanel />
       {/* REPORT — bộ lọc + 4 thẻ kiểu EA Autopilot */}
       <div className="glass-panel p-5 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">

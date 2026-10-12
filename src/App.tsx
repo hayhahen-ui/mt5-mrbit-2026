@@ -13,6 +13,7 @@ import { SigTab } from './components/tabs/SigTab';
 import { RadarTab } from './components/tabs/RadarTab';
 import { NewsTab } from './components/tabs/NewsTab';
 import { ResearchTab } from './components/tabs/ResearchTab';
+import { getGroupId, pushShared } from './lib/groupSync';
 import { LogTab } from './components/tabs/LogTab';
 import { JournalTab } from './components/tabs/JournalTab';
 import { HelpTab } from './components/tabs/HelpTab';
@@ -287,6 +288,16 @@ export const App: React.FC = () => {
       : pos.currentPrice;
     const entry = entryFromPosition(pos, outcome, exitPrice, digits, closeMethod, closeNote);
     setJournal((prev) => [...prev, entry]);
+    // Đẩy lên kho chia sẻ nếu đang trong nhóm (đa thiết bị)
+    try {
+      if (getGroupId()) {
+        pushShared([{
+          ts: Date.now(), type: 'trade', symbol: entry.symbol, direction: entry.direction,
+          entry: entry.entryPrice, exit: entry.exitPrice, lot: entry.lot,
+          pnl: undefined, rMultiple: entry.rMultiple, outcome: entry.outcome, note: entry.note,
+        }]).catch(() => { /* lặng lẽ */ });
+      }
+    } catch { /* noop */ }
     // Liên kết kết quả vào nhật ký Kaizen để phân tích yếu tố
     if (pos.kaizenId) linkKaizenOutcome(pos.kaizenId, outcome, entry.rMultiple);
     setPositions((prev) => prev.filter((p) => p.id !== id));
@@ -412,6 +423,14 @@ export const App: React.FC = () => {
         isMinimized={isMinimized}
         toggleMinimize={() => setIsMinimized(!isMinimized)}
       />
+
+      {/* Banner thiết bị khách trong nhóm chia sẻ */}
+      {(() => { const g = getGroupId(); const fromUrl = new URLSearchParams(window.location.search).get('g'); return g && fromUrl ? (
+        <div className="mx-4 mt-2 px-4 py-2 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-200 text-xs flex items-center gap-2">
+          <span>🔗</span>
+          <span>Thiết bị này đang chia sẻ journal vào nhóm <strong className="font-mono">{g}</strong> — mọi giao dịch đóng sẽ tự lưu vào kho chung.</span>
+        </div>
+      ) : null; })()}
 
       {/* Dashboard tổng quan */}
       <DashboardStrip
