@@ -1,0 +1,46 @@
+# .github/workflows/ff-calendar-weekly.yml
+# Lấy lịch kinh tế ForexFactory hàng tuần → kho online (tránh 429 khi gọi từ Vercel).
+# Cần secrets: FRED_PUSH_PAT (PAT Contents write) — dùng chung với FRED.
+name: FF Calendar weekly snapshot
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Chủ nhật 07:00 VN hàng tuần
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch FF calendar
+        run: |
+          mkdir -p /tmp/ff
+          python3 - <<'EOF'
+          import json, urllib.request, datetime
+          url = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json'
+          req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0'})
+          d = json.load(urllib.request.urlopen(req, timeout=30))
+          if not isinstance(d, list) or len(d) == 0:
+              raise SystemExit('Dữ liệu lạ từ upstream')
+          snap = {'fetchedAt': datetime.datetime.utcnow().isoformat() + 'Z',
+                  'source': 'github-action', 'count': len(d), 'events': d}
+          with open('/tmp/ff/snapshot.json', 'w') as f:
+              json.dump(snap, f)
+          print(f'OK {len(d)} sự kiện')
+          EOF
+
+      - name: Push to data branch
+        env:
+          PAT: ${{ secrets.FRED_PUSH_PAT }}
+        run: |
+          git config --global user.name "ff-bot"
+          git config --global user.email "ff-bot@users.noreply.github.com"
+          rm -rf data-br && git clone --depth 1 --branch data \
+            "https://x-access-token:${PAT}@github.com/hayhahen-ui/mt5-mrbit-2026.git" data-br
+          mkdir -p data-br/research/ff-calendar
+          cp /tmp/ff/snapshot.json data-br/research/ff-calendar/latest.json
+          cd data-br
+          git add research/ff-calendar/latest.json
+          git diff --cached --quiet && echo "Không có gì mới" && exit 0
+          git commit -m "ff-calendar weekly snapshot (github-action)"
+          git push origin data
