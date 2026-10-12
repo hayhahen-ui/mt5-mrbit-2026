@@ -8,7 +8,8 @@ export interface TdCandle { t: number; o: number; h: number; l: number; c: numbe
 
 const KEY = 'nexuspilot-twelvedata-v1';
 const USAGE_KEY = 'nexuspilot-twelvedata-usage-v1';
-const PROXY = '/api/twelvedata';
+import { apiUrl } from './apiHealth';
+const PROXY = apiUrl('/api/twelvedata');
 
 /** Nến 5m qua TwelveData: 9 cặp forex + Vàng.
  *  XAG/USD (Bạc) CHỈ có ở gói trả phí Grow/Venture — đã gỡ khỏi vòng fetch để khỏi tốn credit. */
