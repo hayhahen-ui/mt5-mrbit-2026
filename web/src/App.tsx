@@ -258,6 +258,16 @@ export const App: React.FC = () => {
     ];
 
     setPositions((prev) => [...prev, ...newPositions]);
+    // Đẩy lên kho chia sẻ khi MỞ lệnh (nếu đang trong nhóm)
+    try {
+      if (getGroupId()) {
+        pushShared(newPositions.map((pos) => ({
+          ts: Date.now(), type: 'position_open', symbol: pos.symbol, direction: pos.type,
+          entry: pos.entryPrice, exit: null, lot: pos.lot,
+          pnl: null, rMultiple: null, outcome: 'OPEN', note: `${pos.tier} TP:${pos.tp} SL:${pos.sl}`,
+        }))).catch(() => { /* lặng lẽ */ });
+      }
+    } catch { /* noop */ }
     showToast(`⚡ 1-Click: Đã mở 3 vị thế ${sig.direction} #${sig.symbol} (TP1 50%, TP2 30%, TP3 20%)`);
   };
 

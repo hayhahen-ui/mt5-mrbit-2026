@@ -129,13 +129,13 @@ export const SharedPanel: React.FC = () => {
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-[#1e2b48] text-slate-400 font-mono">
-                  <th className="py-2">Thời gian</th><th>Thiết bị</th><th>Mã</th>
+                  <th className="py-2">Thời gian</th><th>Thiết bị</th><th>Loại</th><th>Mã</th>
                   <th>Hướng</th><th>Giá vào/ra</th><th>Lot</th><th>P&L</th><th>Kết quả</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1e2b48] font-mono">
                 {entries.length === 0 && (
-                  <tr><td colSpan={8} className="py-6 text-center text-slate-500">
+                  <tr><td colSpan={9} className="py-6 text-center text-slate-500">
                     {loading ? 'Đang tải…' : 'Chưa có giao dịch nào trong nhóm.'}
                   </td></tr>
                 )}
@@ -143,6 +143,9 @@ export const SharedPanel: React.FC = () => {
                   <tr key={i} className="hover:bg-[#17223b]/40">
                     <td className="py-2 text-slate-400">{new Date(e.ts).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="text-sky-300">{e.deviceName}</td>
+                    <td>{e.type === 'position_open'
+                      ? <span className="px-1.5 py-0.5 rounded bg-sky-900/60 border border-sky-700 text-sky-300 text-[10px] font-bold">MỞ</span>
+                      : <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-400 text-[10px]">ĐÓNG</span>}</td>
                     <td className="font-bold text-slate-200">#{e.symbol}</td>
                     <td className={e.direction === 'BUY' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{e.direction}</td>
                     <td className="text-slate-400">{e.entry ?? '—'} → {e.exit ?? '—'}</td>
