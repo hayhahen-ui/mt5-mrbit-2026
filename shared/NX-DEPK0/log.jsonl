@@ -43,3 +43,4 @@
 {"ts":1791789563487,"type":"position_open","symbol":"GBPUSD","direction":"BUY","entry":1.32558,"exit":null,"lot":0.01,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP2 TP:1.32781 SL:1.32446","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1791789563487,"type":"position_open","symbol":"GBPUSD","direction":"BUY","entry":1.32558,"exit":null,"lot":0.01,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP3 TP:1.32893 SL:1.32446","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1791789565303,"type":"trade","symbol":"GBPUSD","direction":"BUY","entry":1.32558,"exit":1.32446,"lot":0.01,"pnl":null,"rMultiple":-1,"outcome":"SL","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
+{"ts":1791789676012,"type":"trade","symbol":"XAUUSD","direction":"BUY","entry":4187.5,"exit":4185.41,"lot":0.01,"pnl":null,"rMultiple":-1,"outcome":"SL","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
