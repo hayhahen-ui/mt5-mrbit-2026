@@ -9,6 +9,7 @@ import {
   FRED_SERIES_META, FredSeries, FredSeriesId,
 } from '../../lib/research/fred';
 import { computeDirectionScore, directionBadge, DirectionResult } from '../../lib/research/directionScore';
+import { useDirectionScores } from '../../lib/research/useDirectionScores';
 import { Signal } from '../../types';
 
 interface ResearchTabProps {
@@ -31,39 +32,45 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
   const [symbol, setSymbol] = useState('EURUSD');
   const [tierFilter, setTierFilter] = useState<SourceTier | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
-  const [fred, setFred] = useState<Record<FredSeriesId, FredSeries> | null>(null);
-  const [fredLoading, setFredLoading] = useState(false);
   const [keyInput, setKeyInput] = useState(getFredKey());
   const [keySaved, setKeySaved] = useState(!!getFredKey());
+  const [fredLoading, setFredLoading] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  // Dữ liệu FRED: ưu tiên kho online (dùng chung mọi thiết bị)
+  const { fred: fredData, fredLoaded, fredSource } = useDirectionScores(signals);
+  void refreshTick;
 
   const loadFred = async () => {
+    // Tải lại trực tiếp qua API (bỏ cache) — dùng khi vừa lưu key mới
     setFredLoading(true);
+    clearFredCache();
+    // Xóa cache online trong fredStore bằng cách fetch lại
     const data = await fetchAllFred();
-    setFred(data);
+    // Đẩy lên kho online cho thiết bị khác
+    const { pushFredSnapshot } = await import('../../lib/research/fredStore');
+    await pushFredSnapshot(data, 'app-push').catch(() => {});
     setFredLoading(false);
+    setRefreshTick((t) => t + 1);
   };
-
-  useEffect(() => { loadFred(); }, []);
 
   const saveKey = () => {
     setFredKey(keyInput);
     setKeySaved(!!keyInput.trim());
-    clearFredCache();
     loadFred();
   };
 
   const drivers = useMemo(() => ASSET_DRIVERS.find((d) => d.symbol === symbol)!, [symbol]);
 
   const direction: DirectionResult | null = useMemo(() => {
-    if (!fred) return null;
+    if (!fredData) return null;
     const sig = signals[symbol];
     return computeDirectionScore({
       symbol,
-      fred,
+      fred: fredData,
       priceDirection: sig?.direction || 'FLAT',
       priceScore: sig?.scoreBreakdown ? sig.scoreBreakdown.reduce((s, f: any) => s + f.points, 0) : 0,
     });
-  }, [fred, signals, symbol]);
+  }, [fredData, signals, symbol]);
 
   const filteredSources = useMemo(() => {
     const q = search.toLowerCase();
@@ -74,7 +81,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
     });
   }, [tierFilter, search]);
 
-  const fredOk = fred && Object.values(fred).some((s) => !s.error && s.latest);
+  const fredOk = (fredData && Object.values(fredData).some((s) => !s.error && s.latest)) || fredLoaded;
 
   return (
     <div className="space-y-4">
@@ -125,10 +132,13 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
 
           {/* FRED data cards */}
           <div className="glass-panel p-4 space-y-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <TrendingUp size={15} className="text-sky-400" />
               <span className="font-bold text-xs text-slate-100">DỮ LIỆU FRED (TẦNG B)</span>
               <EvidenceTag label="FACT" />
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#17223b] border border-[#243356] text-slate-400" title="Kho online dùng chung mọi thiết bị — đồng bộ qua nhánh data GitHub">
+                📡 {fredSource.label}
+              </span>
             </div>
             {!fredOk && (
               <div className="text-[11px] text-amber-300/90 border border-amber-800/50 bg-amber-950/30 rounded-lg p-2.5">
@@ -138,7 +148,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {(Object.keys(FRED_SERIES_META) as FredSeriesId[]).map((id) => {
                 const meta = FRED_SERIES_META[id];
-                const s = fred?.[id];
+                const s = fredData?.[id];
                 const up = s?.change !== null && s?.change !== undefined && s.change > 0;
                 return (
                   <div key={id} className="rounded-lg border border-[#1e2b48] bg-[#0d1526] p-2.5">

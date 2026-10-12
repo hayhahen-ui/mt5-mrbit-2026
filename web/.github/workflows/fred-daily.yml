@@ -1,0 +1,69 @@
+# .github/workflows/fred-daily.yml
+# Lấy dữ liệu FRED hàng ngày → đẩy lên nhánh `data` (research/fred/).
+# Kho online dùng chung mọi thiết bị — app đọc không cần API key.
+# Cần: repo secret FRED_API_KEY (lấy free tại fred.stlouisfed.org).
+name: FRED daily snapshot
+
+on:
+  schedule:
+    - cron: '30 0 * * *'  # 07:30 giờ VN hàng ngày
+  workflow_dispatch:      # cho phép chạy tay
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch FRED series
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          if [ -z "$FRED_API_KEY" ]; then echo "Thiếu secret FRED_API_KEY"; exit 1; fi
+          mkdir -p /tmp/fred
+          python3 - <<'EOF'
+          import json, os, urllib.request, datetime
+          key = os.environ['FRED_API_KEY']
+          series_ids = ['DGS2', 'DGS10', 'DFII10', 'DTWEXBGS', 'T10YIE']
+          out = {}
+          for sid in series_ids:
+              url = (f'https://api.stlouisfed.org/fred/series/observations?series_id={sid}'
+                     f'&api_key={key}&file_type=json&sort_order=desc&limit=5')
+              req = urllib.request.Request(url, headers={'User-Agent': 'NexusPilot/1.0'})
+              d = json.load(urllib.request.urlopen(req, timeout=30))
+              pts = [(o['date'], o['value']) for o in d.get('observations', []) if o['value'] != '.']
+              if len(pts) >= 1:
+                  out[sid] = {'date': pts[0][0], 'value': float(pts[0][1])}
+                  if len(pts) >= 2:
+                      out[sid]['prevDate'] = pts[1][0]
+                      out[sid]['prevValue'] = float(pts[1][1])
+              else:
+                  out[sid] = {'date': '', 'value': None}
+              print(sid, out[sid])
+          day = datetime.date.today().isoformat()
+          snap = {'asOf': day, 'fetchedAt': datetime.datetime.utcnow().isoformat() + 'Z',
+                  'source': 'github-action', 'series': out}
+          ok = sum(1 for v in out.values() if v['value'] is not None)
+          if ok < 3:
+              raise SystemExit(f'Chỉ lấy được {ok}/5 chuỗi — dừng để tránh ghi dữ liệu rỗng')
+          with open('/tmp/fred/snapshot.json', 'w') as f:
+              json.dump(snap, f)
+          print(f'OK {ok}/5 chuỗi, ngày {day}')
+          EOF
+
+      - name: Push to data branch
+        env:
+          PAT: ${{ secrets.FRED_PUSH_PAT }}
+        run: |
+          DAY=$(date +%F)
+          git config --global user.name "fred-bot"
+          git config --global user.email "fred-bot@users.noreply.github.com"
+          # Clone nhánh data (nông)
+          rm -rf data-br && git clone --depth 1 --branch data \
+            "https://x-access-token:${PAT}@github.com/hayhahen-ui/mt5-mrbit-2026.git" data-br
+          mkdir -p data-br/research/fred/history
+          cp /tmp/fred/snapshot.json data-br/research/fred/latest.json
+          cp /tmp/fred/snapshot.json "data-br/research/fred/history/${DAY}.json"
+          cd data-br
+          git add research/fred/latest.json "research/fred/history/${DAY}.json"
+          git diff --cached --quiet && echo "Không có gì mới" && exit 0
+          git commit -m "fred snapshot ${DAY} (github-action)"
+          git push origin data
