@@ -207,7 +207,7 @@ export const App: React.FC = () => {
         const pipSize = isJpy ? 0.01 : curAsset.category === 'Forex' ? 0.0001 : 0.1;
         const pips = diff / pipSize;
         // $/pip/lot: forex thường = $10; JPY = 1000/giá (vì 1 pip = 1000 JPY/lot → đổi ra USD)
-        const usdPerPipPerLot = isJpy ? 1000 / curAsset.price : curAsset.category === 'Forex' ? 10 : 1;
+        const usdPerPipPerLot = isJpy ? 1000 / curAsset.price : curAsset.category === 'Forex' ? 10 : 0.1; // crypto: 1 pip = $0.10/lot
         const pnl = pips * p.lot * usdPerPipPerLot;
         return {
           ...p,
