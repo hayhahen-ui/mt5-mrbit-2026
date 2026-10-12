@@ -12,6 +12,49 @@ import { computeDirectionScore, directionBadge, DirectionResult } from '../../li
 import { useDirectionScores, getGoldFlow, setGoldFlow } from '../../lib/research/useDirectionScores';
 import { Signal } from '../../types';
 
+const DIGEST_URL = 'https://raw.githubusercontent.com/hayhahen-ui/mt5-mrbit-2026/data/research/digest/latest.json';
+
+function DigestPanel() {
+  const [d, setD] = useState<any>(null);
+  useEffect(() => {
+    fetch(DIGEST_URL).then((r) => (r.ok ? r.json() : null)).then(setD).catch(() => {});
+  }, []);
+  if (!d) return (
+    <div className="glass-panel p-4 text-[11px] text-slate-500">
+      📋 Bản tin thị trường hàng ngày — đang tải từ kho GitHub… (Action chạy 08:00 VN mỗi ngày)
+    </div>
+  );
+  const syms = d.symbols || {};
+  return (
+    <div className="glass-panel p-4 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-bold text-xs text-slate-100">📋 BẢN TIN THỊ TRƯỜNG HÀNG NGÀY</span>
+        <span className="text-[10px] font-mono text-slate-500">ngày {d.asOf} · lưu trên GitHub làm kho tham khảo</span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {Object.entries(syms).map(([sym, v]: [string, any]) => (
+          <div key={sym} className="p-2.5 rounded-lg bg-[#0b0f19] border border-[#1e2b48]">
+            <div className="text-[10px] font-mono font-bold text-violet-300">#{sym}</div>
+            <div className="text-sm font-mono font-bold text-slate-100">
+              {v.price !== null && v.price !== undefined ? v.price.toLocaleString() : '—'}
+            </div>
+            <div className="text-[9px] text-slate-600">{v.source || v.error || ''}</div>
+          </div>
+        ))}
+      </div>
+      {(d.summary || []).length > 0 && (
+        <div className="space-y-1">
+          {(d.summary as string[]).map((line, i) => (
+            <div key={i} className="text-[11px] text-slate-300 flex gap-1.5">
+              <span className="text-sky-400">▸</span><span>{line}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ResearchTabProps {
   signals: Record<string, Signal>;
 }
@@ -28,7 +71,7 @@ function EvidenceTag({ label }: { label: EvidenceLabel }) {
 }
 
 export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
-  const [section, setSection] = useState<'factors' | 'sources'>('factors');
+  const [section, setSection] = useState<'factors' | 'digest' | 'sources'>('factors');
   const [symbol, setSymbol] = useState('EURUSD');
   const [tierFilter, setTierFilter] = useState<SourceTier | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
@@ -95,7 +138,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
           </div>
         </div>
         <div className="flex gap-1.5">
-          {([['factors', '📊 Yếu tố & Điểm'], ['sources', '📚 Truy tìm nguồn']] as const).map(([k, label]) => (
+          {([['factors', '📊 Yếu tố & Điểm'], ['digest', '📋 Bản tin hàng ngày'], ['sources', '📚 Truy tìm nguồn']] as const).map(([k, label]) => (
             <button key={k} onClick={() => setSection(k)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
                 section === k ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-[#0b0f19] text-slate-400 border-[#1e2b48] hover:text-white'
@@ -259,6 +302,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ signals }) => {
           </div>
         </>
       )}
+
+      {section === 'digest' && <DigestPanel />}
 
       {section === 'sources' && (
         <div className="glass-panel p-4 space-y-3">

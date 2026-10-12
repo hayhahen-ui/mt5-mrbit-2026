@@ -1,0 +1,111 @@
+# .github/workflows/market-digest-daily.yml
+# Tổng hợp phân tích thị trường hàng ngày cho XAUUSD + cặp tiền tệ:
+# giá đóng cửa, biến động, điểm vĩ mô, tóm tắt → lưu nhánh `data` (research/digest/).
+# App đọc hiển thị ở tab NGHIÊN CỨU — kho tham khảo dài hạn cho phân tích.
+# Cần: secret FRED_PUSH_PAT (đã có).
+name: Market digest daily
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 08:00 giờ VN hàng ngày (sau FRED 07:30)
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build digest
+        run: |
+          mkdir -p /tmp/digest
+          python3 - <<'EOF'
+          import json, urllib.request, datetime
+
+          def get(url, timeout=25):
+              req = urllib.request.Request(url, headers={'User-Agent': 'NexusPilot/1.0'})
+              return json.load(urllib.request.urlopen(req, timeout=timeout))
+
+          day = datetime.date.today().isoformat()
+          now = datetime.datetime.utcnow().isoformat() + 'Z'
+          digest = {'asOf': day, 'builtAt': now, 'source': 'github-action', 'symbols': {}}
+
+          # 1) Giá XAUUSD (Gold-API public)
+          try:
+              g = get('https://api.gold-api.com/price/XAU')
+              digest['symbols']['XAUUSD'] = {
+                  'price': g.get('price'), 'source': 'gold-api.com',
+                  'change24h': None, 'note': 'Giá spot realtime tại thời điểm build',
+              }
+              print('XAUUSD:', g.get('price'))
+          except Exception as e:
+              digest['symbols']['XAUUSD'] = {'price': None, 'error': str(e)[:120]}
+              print('XAUUSD lỗi:', e)
+
+          # 2) Forex (ER-API public, base USD)
+          try:
+              fx = get('https://open.er-api.com/v6/latest/USD')
+              rates = fx.get('rates', {})
+              for sym, pair in [('EURUSD','EUR'), ('GBPUSD','GBP'), ('USDJPY','JPY')]:
+                  r = rates.get(pair)
+                  price = round(1/r, 5) if pair in ('EUR','GBP') and r else (round(r, 3) if r else None)
+                  digest['symbols'][sym] = {'price': price, 'source': 'open.er-api.com (daily)'}
+                  print(sym, price)
+          except Exception as e:
+              print('Forex lỗi:', e)
+
+          # 3) FRED mới nhất từ kho data (nguồn vĩ mô)
+          try:
+              fred = get('https://raw.githubusercontent.com/hayhahen-ui/mt5-mrbit-2026/data/research/fred/latest.json')
+              digest['fred'] = fred.get('series', {})
+              print('FRED asOf:', fred.get('asOf'))
+          except Exception as e:
+              digest['fred'] = {'error': str(e)[:120]}
+              print('FRED lỗi:', e)
+
+          # 4) Gold flows mới nhất
+          try:
+              gf = get('https://raw.githubusercontent.com/hayhahen-ui/mt5-mrbit-2026/data/research/gold-flows/latest.json')
+              digest['goldFlows'] = {'wgc': gf.get('wgc'), 'gld': gf.get('gld'), 'asOf': gf.get('asOf')}
+              print('Gold flows asOf:', gf.get('asOf'))
+          except Exception as e:
+              digest['goldFlows'] = {'error': str(e)[:120]}
+              print('Gold flows lỗi:', e)
+
+          # 5) Tóm tắt tự động (rule-based, minh bạch)
+          notes = []
+          s = digest['fred']
+          if isinstance(s, dict) and s.get('DGS10', {}).get('value') is not None:
+              dgs10 = s['DGS10']['value']; dfii10 = s.get('DFII10', {}).get('value')
+              notes.append(f"Lợi suất 10Y {dgs10}%" + (f", lợi suất thực {dfii10}%" if dfii10 else ""))
+              if dfii10 and dfii10 > 2.0: notes.append("Lợi suất thực cao (>2%) — thường gây áp lực lên vàng")
+              elif dfii10 and dfii10 < 1.0: notes.append("Lợi suất thực thấp (<1%) — môi trường thuận lợi cho vàng")
+          if isinstance(s, dict) and s.get('DTWEXBGS', {}).get('value') is not None:
+              notes.append(f"Chỉ số USD {s['DTWEXBGS']['value']}")
+          gf = digest.get('goldFlows', {})
+          if isinstance(gf.get('wgc'), dict) and gf['wgc'].get('flowTons') is not None:
+              ft = gf['wgc']['flowTons']
+              notes.append(f"Dòng vốn ETF vàng tháng gần nhất: {'+' if ft>0 else ''}{ft} tấn ({'vào' if ft>0 else 'ra'})")
+          digest['summary'] = notes
+
+          with open('/tmp/digest/digest.json', 'w') as f:
+              json.dump(digest, f, ensure_ascii=False)
+          ok = sum(1 for v in digest['symbols'].values() if v.get('price'))
+          print(f'OK {ok}/4 mã có giá, {len(notes)} ghi chú phân tích')
+          EOF
+
+      - name: Push to data branch
+        env:
+          PAT: ${{ secrets.FRED_PUSH_PAT }}
+        run: |
+          DAY=$(date +%F)
+          git config --global user.name "digest-bot"
+          git config --global user.email "digest-bot@users.noreply.github.com"
+          rm -rf data-br && git clone --depth 1 --branch data \
+            "https://x-access-token:${PAT}@github.com/hayhahen-ui/mt5-mrbit-2026.git" data-br
+          mkdir -p data-br/research/digest
+          cp /tmp/digest/digest.json data-br/research/digest/latest.json
+          cp /tmp/digest/digest.json "data-br/research/digest/${DAY}.json"
+          cd data-br
+          git add research/digest/latest.json "research/digest/${DAY}.json"
+          git diff --cached --quiet && echo "Không có gì mới" && exit 0
+          git commit -m "market digest ${DAY} (github-action)"
+          git push origin data
