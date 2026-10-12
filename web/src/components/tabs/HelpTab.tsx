@@ -2,6 +2,7 @@ import React from 'react';
 import { AiSettings } from '../AiSettings';
 import { MfSettings } from '../MfSettings';
 import { TwelvedataSettings } from '../TwelvedataSettings';
+import { FredSettings } from '../FredSettings';
 import { GhSyncSettings } from '../GhSyncSettings';
 import { HelpCircle, Keyboard, CheckSquare } from 'lucide-react';
 
@@ -18,7 +19,7 @@ export const HelpTab: React.FC = () => {
     { key: 'H', desc: 'Mở tab HELP (Trợ giúp nhanh)' },
     { key: 'K', desc: 'Đóng / Mở thanh Dock công cụ bên trái' },
     { key: 'M', desc: 'Thu gọn (Minimize) hoặc Mở rộng Cockpit' },
-    { key: 'R', desc: 'Tải về báo cáo kiểm toán HTML ngay lập tức' }
+    { key: 'R', desc: 'Mở tab NGHIÊN CỨU (Nguồn vĩ mô & Điểm định hướng Blueprint)' }
   ];
 
   return (
@@ -26,6 +27,7 @@ export const HelpTab: React.FC = () => {
       <AiSettings />
       <MfSettings />
       <TwelvedataSettings />
+      <FredSettings />
       <GhSyncSettings />
       {/* Keyboard Shortcuts */}
       <div className="glass-panel p-5 space-y-4">
