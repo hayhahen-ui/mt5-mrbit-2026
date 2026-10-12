@@ -1,1 +1,37 @@
-{"asOf": "2026-10-12", "fetchedAt": "2026-10-12T03:16:57.498946Z", "source": "github-action", "series": {"DGS2": {"date": "2026-10-08", "value": 4.75, "prevDate": "2026-10-07", "prevValue": 4.77}, "DGS10": {"date": "2026-10-08", "value": 5.22, "prevDate": "2026-10-07", "prevValue": 5.28}, "DFII10": {"date": "2026-10-08", "value": 2.87, "prevDate": "2026-10-07", "prevValue": 2.92}, "DTWEXBGS": {"date": "2026-10-02", "value": 121.3848, "prevDate": "2026-10-01", "prevValue": 121.7882}, "T10YIE": {"date": "2026-10-09", "value": 2.33, "prevDate": "2026-10-08", "prevValue": 2.35}}}
+{
+ "asOf": "2026-10-12",
+ "fetchedAt": "2026-10-12T05:31:04.369Z",
+ "source": "app-push",
+ "series": {
+  "DGS2": {
+   "date": "2026-10-08",
+   "value": 4.75,
+   "prevDate": "2026-10-07",
+   "prevValue": 4.77
+  },
+  "DGS10": {
+   "date": "2026-10-08",
+   "value": 5.22,
+   "prevDate": "2026-10-07",
+   "prevValue": 5.28
+  },
+  "DFII10": {
+   "date": "2026-10-08",
+   "value": 2.87,
+   "prevDate": "2026-10-07",
+   "prevValue": 2.92
+  },
+  "DTWEXBGS": {
+   "date": "2026-10-02",
+   "value": 121.3848,
+   "prevDate": "2026-10-01",
+   "prevValue": 121.7882
+  },
+  "T10YIE": {
+   "date": "2026-10-09",
+   "value": 2.33,
+   "prevDate": "2026-10-08",
+   "prevValue": 2.35
+  }
+ }
+}
