@@ -300,6 +300,23 @@ export const FlightTab: React.FC<FlightTabProps> = ({
                 <div className="text-[10px] text-slate-500 pl-4">{f.detail}</div>
               </div>
             ))}
+            {/* Lớp xác nhận vĩ mô (Blueprint §9) */}
+            {signal.macroAdj !== undefined && signal.macroAdj !== 0 && (
+              <div className="mt-2 p-2 rounded-lg bg-[#0d1526] border border-purple-800/40">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-purple-300 font-bold">🌐 Xác nhận vĩ mô</span>
+                  <span className={`font-mono font-bold ${signal.macroAdj > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {signal.macroAdj > 0 ? '+' : ''}{signal.macroAdj} điểm
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{signal.macroNote}</div>
+                {signal.baseScore !== undefined && (
+                  <div className="text-[10px] text-slate-600 font-mono">
+                    Điểm kỹ thuật {signal.baseScore} → sau vĩ mô {signal.baseScore + signal.macroAdj}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

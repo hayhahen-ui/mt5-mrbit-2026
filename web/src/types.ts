@@ -171,6 +171,10 @@ export interface Signal {
   /** Chi tiết chấm điểm minh bạch (Trade.2026-style). Nếu thiếu, UI tự suy từ quality. */
   scoreBreakdown?: ScoreFactor[];
   verdict?: SignalVerdict;
+  /** Điều chỉnh từ lớp xác nhận vĩ mô (Blueprint §9) */
+  macroAdj?: number;
+  macroNote?: string;
+  baseScore?: number;
 }
 
 export interface Asset {

@@ -226,6 +226,24 @@ export function computeDirectionScore(inp: DirectionInputs): DirectionResult {
   return { symbol: inp.symbol, directionScore, coveragePct, bias, groups, blockers, computedAt: Date.now() };
 }
 
+/**
+ * Tính điểm VĨ MÔ THUẦN cho engine (loại trừ nhóm 'structure' kỹ thuật).
+ * Dùng prelimDirection từ engine để tránh phụ thuộc vòng tròn signal.
+ */
+export function computeMacroOnly(inp: DirectionInputs): { score: number | null; coveragePct: number } {
+  const r = computeDirectionScore({ ...inp, priceDirection: 'FLAT', priceScore: 50 });
+  // Loại trừ nhóm structure khỏi coverage và score
+  const macroGroups = r.groups.filter((g) => g.id !== 'structure');
+  const coveragePct = macroGroups.reduce((sum, g) => sum + (g.score !== null ? g.weight : 0), 0);
+  // Tính lại score chỉ từ nhóm macro (chuẩn hoá theo tổng weight macro)
+  const totalW = macroGroups.reduce((sum, g) => sum + g.weight, 0);
+  let score: number | null = null;
+  if (coveragePct >= 70) {
+    score = Math.round(macroGroups.reduce((sum, g) => sum + (g.score !== null ? g.weight * g.score / 2 : 0), 0) * (100 / totalW));
+  }
+  return { score, coveragePct };
+}
+
 /** Mô tả ngắn cho badge RADAR */
 export function directionBadge(r: DirectionResult): string {
   if (r.blockers.length > 0) return '⛔ BỊ CHẶN';

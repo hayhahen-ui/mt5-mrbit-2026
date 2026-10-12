@@ -120,6 +120,10 @@ export interface EngineInput {
   riskPct: number;
   /** Engine nào đang bật (tab SIG). Engine bị tắt → tín hiệu loại đó bị chặn. */
   engines?: Partial<Record<EngineId, boolean>>;
+  /** Điểm vĩ mô Blueprint (-100..+100, null = thiếu dữ liệu) — lớp xác nhận hướng */
+  macroScore?: number | null;
+  /** Coverage vĩ mô (%) — <70% thì không dùng để xác nhận */
+  macroCoverage?: number;
 }
 
 export function pickEngine(rsiV: number, rocV: number): EngineId {
@@ -202,7 +206,33 @@ export function evaluateSignal(
     return { signal: null, snapshot, rawFeatures };
   }
 
-  const score = totalScore(factors as any);
+  const baseScore = totalScore(factors as any);
+
+  // --- LỚP XÁC NHẬN VĨ MÔ (Blueprint §9): cộng/trừ điểm theo độ đồng thuận ---
+  // macroScore: -100..+100 (dương = ủng hộ BUY, âm = ủng hộ SELL)
+  // Chỉ áp dụng khi coverage >= 70% (đủ dữ liệu tin cậy)
+  let macroAdj = 0;
+  let macroNote = 'Chưa có dữ liệu vĩ mô';
+  const mScore = input.macroScore;
+  const mCov = input.macroCoverage || 0;
+  if (mScore !== null && mScore !== undefined && mCov >= 70 && direction !== 'FLAT') {
+    const macroBullish = mScore >= 20;
+    const macroBearish = mScore <= -20;
+    const aligned = (direction === 'BUY' && macroBullish) || (direction === 'SELL' && macroBearish);
+    const opposed = (direction === 'BUY' && macroBearish) || (direction === 'SELL' && macroBullish);
+    if (aligned) {
+      macroAdj = Math.min(8, Math.round(Math.abs(mScore) / 12));
+      macroNote = `Vĩ mô đồng thuận (${mScore >= 0 ? '+' : ''}${mScore}): +${macroAdj}`;
+    } else if (opposed) {
+      macroAdj = -Math.min(12, Math.round(Math.abs(mScore) / 8));
+      macroNote = `Vĩ mô ngược hướng (${mScore >= 0 ? '+' : ''}${mScore}): ${macroAdj}`;
+    } else {
+      macroNote = `Vĩ mô trung tính (${mScore}): không điều chỉnh`;
+    }
+  } else if (mCov > 0 && mCov < 70) {
+    macroNote = `Vĩ mô thiếu dữ liệu (${mCov}% < 70%): không dùng`;
+  }
+  const score = Math.max(0, Math.min(100, baseScore + macroAdj));
   const verdict = getVerdict(score);
   const quality = score >= 80 ? 'Q5' : score >= 65 ? 'Q4' : score >= 50 ? 'Q3' : score >= 35 ? 'Q2' : 'Q1';
 
@@ -251,6 +281,7 @@ export function evaluateSignal(
     timestamp: 'Vừa cập nhật từ dữ liệu thật',
     scoreBreakdown: factors as any,
     verdict,
+    macroAdj, macroNote, baseScore,
   };
 
   // Nhật ký Kaizen: ghi mọi đánh giá có hướng (chống trùng 15')

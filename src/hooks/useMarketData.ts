@@ -17,6 +17,12 @@ import { observeCandidate } from '../lib/neural/observer';
 import { recordPrices, seedCloses, HEATMAP_SYMBOLS } from '../lib/priceHistory';
 import { maybeForexSnapshot } from '../lib/forexJournal';
 import { totalScore } from '../lib/scoring';
+import { fetchFredSnapshotOnline, snapshotToSeries } from '../lib/research/fredStore';
+import { fetchAllFred } from '../lib/research/fred';
+import { computeMacroOnly } from '../lib/research/directionScore';
+import { getCachedOutlook, findSentiment } from '../lib/sentiment';
+import { getGoldFlow } from '../lib/research/useDirectionScores';
+import { fetchGoldFlows } from '../lib/research/goldFlows';
 
 export interface MarketDataState {
   assets: Asset[];
@@ -29,6 +35,50 @@ export interface MarketDataState {
 }
 
 const KRAKEN_PAIR: Record<string, string> = { BTCUSD: 'XBTUSD', ETHUSD: 'ETHUSD' };
+
+/** Cache điểm vĩ mô (tính 1 lần, dùng cho mọi lần evaluate) */
+let macroCache: Record<string, { score: number | null; coveragePct: number }> | null = null;
+let macroCacheAt = 0;
+const MACRO_TTL = 30 * 60 * 1000; // 30 phút
+
+function getMacroScoresSync(): Record<string, { score: number | null; coveragePct: number }> {
+  // Trigger refresh nền nếu hết hạn (không block)
+  if (!macroCache || Date.now() - macroCacheAt >= MACRO_TTL) {
+    getMacroScoresAsync().catch(() => { /* lặng lẽ */ });
+  }
+  return macroCache || {};
+}
+
+async function getMacroScoresAsync(): Promise<Record<string, { score: number | null; coveragePct: number }>> {
+  if (macroCache && Date.now() - macroCacheAt < MACRO_TTL) return macroCache;
+  try {
+    // FRED: kho online → API
+    let fred = null;
+    const online = await fetchFredSnapshotOnline();
+    if (online && online.ageH < 36) fred = snapshotToSeries(online.snap);
+    else fred = await fetchAllFred();
+    const hasData = Object.values(fred).some((s: any) => !s.error && s.latest);
+    if (!hasData) return macroCache || {};
+    const outlook = getCachedOutlook();
+    const goldFlowManual = getGoldFlow();
+    const flows = await fetchGoldFlows().catch(() => null);
+    const wgcOnline = flows?.wgc?.flowTons ?? null;
+    const gldSignal = flows?.gld?.signal ?? null;
+    const out: Record<string, { score: number | null; coveragePct: number }> = {};
+    for (const sym of ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD']) {
+      const sent = findSentiment(outlook, sym);
+      out[sym] = computeMacroOnly({
+        symbol: sym, fred,
+        priceDirection: 'FLAT', priceScore: 50,
+        sentimentLongPct: sent ? sent.longPct : null,
+        goldFlowTons: sym === 'XAUUSD' ? (wgcOnline !== null ? wgcOnline : goldFlowManual) : null,
+        gldSignal: sym === 'XAUUSD' ? gldSignal : null,
+      });
+    }
+    macroCache = out; macroCacheAt = Date.now();
+    return out;
+  } catch { return macroCache || {}; }
+}
 const CRYPTO_POLL_MS = 60000;
 const FOREX_POLL_MS = 600000;
 const NEWS_POLL_MS = 900000;
@@ -172,10 +222,12 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
           return { ...a, price, change24h, dataSource: source, sourceName, updatedAt, warmup: history.warmup(a.symbol) };
         });
 
-        // Engine đánh giá lại toàn bộ
+        // Engine đánh giá lại toàn bộ (lấy điểm vĩ mô 1 lần cho tất cả mã)
         const signals: Record<string, Signal> = {};
         const snapshots: Record<string, MarketSnapshot> = {};
+        const macroScores = getMacroScoresSync();
         const nextAssets = assets.map((a) => {
+          const macro = macroScores[a.symbol];
           const { signal, snapshot, rawFeatures } = evaluateSignal(
             {
               asset: a,
@@ -187,6 +239,8 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
               equity: equityRef.current,
               riskPct: riskRef.current,
               engines: getEngineToggles(),
+              macroScore: macro?.score ?? null,
+              macroCoverage: macro?.coveragePct ?? 0,
             },
             history
           );
