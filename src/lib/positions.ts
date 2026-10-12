@@ -67,9 +67,10 @@ export const LEVERAGE = 100;
  */
 export function positionMargin(p: Position): number {
   const { symbol, lot, entryPrice } = p;
-  if (symbol === 'XAUUSD') return (lot * 100 * entryPrice) / LEVERAGE;
-  if (symbol === 'BTCUSD' || symbol === 'ETHUSD') return (lot * entryPrice) / LEVERAGE;
-  // Forex: mặc định 1 lot = 100.000
+  if (symbol === 'XAUUSD') return (lot * 100 * entryPrice) / LEVERAGE; // 1 lot = 100 oz
+  if (symbol === 'BTCUSD' || symbol === 'ETHUSD') return (lot * entryPrice) / LEVERAGE; // 1 lot = 1 coin
+  // Forex: USD là đồng yết giá (EURUSD, GBPUSD...) → nhân giá; USD là đồng cơ sở (USDJPY) → không nhân giá
+  if (symbol.startsWith('USD')) return (lot * 100000) / LEVERAGE;
   return (lot * 100000 * entryPrice) / LEVERAGE;
 }
 
