@@ -1,0 +1,3 @@
+{"ts":1791785671072,"type":"position_open","symbol":"XAUUSD","direction":"FLAT","entry":4187.6,"exit":null,"lot":7.47,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP1 TP:4180.91 SL:4194.29","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
+{"ts":1791785671072,"type":"position_open","symbol":"XAUUSD","direction":"FLAT","entry":4187.6,"exit":null,"lot":4.48,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP2 TP:4174.22 SL:4194.29","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
+{"ts":1791785671072,"type":"position_open","symbol":"XAUUSD","direction":"FLAT","entry":4187.6,"exit":null,"lot":3,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP3 TP:4167.53 SL:4194.29","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
