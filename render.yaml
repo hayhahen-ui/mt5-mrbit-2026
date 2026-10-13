@@ -1,5 +1,7 @@
 # render.yaml — Deploy frontend lên Render Static Site (không giới hạn deploy/ngày như Vercel).
-# API vẫn chạy trên Vercel (https://mt5-mrbit-2026-web.vercel.app/api/*).
+# API positions nấc 2 chạy trên Render Web Service riêng (mt5-mrbit-2026-api, api-server/).
+# Các API còn lại (fred, twelvedata, shared, ff-calendar...) vẫn ở Vercel
+# (https://mt5-mrbit-2026-web.vercel.app/api/*).
 # Sau khi push file này, user vào render.com → New → Static Site → chọn repo → dùng cấu hình dưới.
 services:
   - type: web
@@ -17,3 +19,20 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+  - type: web
+    name: mt5-mrbit-2026-api
+    env: node
+    plan: free
+    repo: https://github.com/hayhahen-ui/mt5-mrbit-2026.git
+    branch: main
+    rootDir: api-server
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: NAIVE_AGENT_KEY
+        sync: false

@@ -5,8 +5,16 @@
  * - Nếu server chưa cấu hình Supabase (503) → im lặng, app chạy local-only như cũ.
  * - Id đã đẩy được lưu localStorage để không đẩy trùng sau F5.
  */
-import { apiUrl } from './apiHealth';
+import { API_BASE } from './apiHealth';
 import type { Position } from '../types';
+
+/**
+ * Base URL cho API positions nấc 2.
+ * - Production: VITE_POSITIONS_API_URL → Render Web Service (mt5-mrbit-2026-api)
+ * - Fallback: API_BASE (Vercel) khi chưa cấu hình — giữ tương thích.
+ */
+const POS_BASE = (import.meta as any).env?.VITE_POSITIONS_API_URL || API_BASE;
+const posUrl = (path: string) => `${POS_BASE}${path}`;
 
 const PUSHED_KEY = 'nexuspilot-synced-positions-v1';
 const UNAVAIL_KEY = 'nexuspilot-server-unavail-until';
@@ -46,7 +54,7 @@ function isMarkedUnavailable(): boolean {
 async function post(path: string, body: unknown): Promise<boolean> {
   if (availCache === false || isMarkedUnavailable()) return false;
   try {
-    const r = await fetch(apiUrl(path), {
+    const r = await fetch(posUrl(path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -111,7 +119,7 @@ export async function checkServerAvailable(): Promise<boolean> {
   if (availCache !== null) return availCache;
   if (isMarkedUnavailable()) return false;
   try {
-    const r = await fetch(apiUrl('/api/positions?status=open&limit=1'));
+    const r = await fetch(posUrl('/api/positions?status=open&limit=1'));
     if (r.status === 503) { availCache = false; markUnavailable(); return false; }
     availCache = r.ok;
     return r.ok;

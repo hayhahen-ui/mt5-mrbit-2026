@@ -1,0 +1,1 @@
+{"dependencies":{"express":"^4.21.2"},"description":"API server nấc 2 (positions/agent) chạy trên Render Web Service — adapter Express cho các handler Vercel-style trong ../api/.","name":"mt5-mrbit-2026-api","private":true,"scripts":{"start":"node server.js"},"type":"module","version":"1.0.0"}
