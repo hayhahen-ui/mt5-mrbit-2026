@@ -14,7 +14,8 @@ import { RadarTab } from './components/tabs/RadarTab';
 import { NewsTab } from './components/tabs/NewsTab';
 import { ResearchTab } from './components/tabs/ResearchTab';
 import DataFlowTab from './components/tabs/DataFlowTab';
-import { getGroupId, pushShared, lastPushedTs, markPushed } from './lib/groupSync';
+import { getGroupId, getDeviceId, pushShared, lastPushedTs, markPushed } from './lib/groupSync';
+import { pushOpenedPositions, pushClosedPosition, pushUpdatedPosition, pushAccountState } from './lib/serverSync';
 import { entryPnlUsd } from './lib/account';
 import { LogTab } from './components/tabs/LogTab';
 import { JournalTab } from './components/tabs/JournalTab';
@@ -65,6 +66,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     positionsRef.current = positions;
   }, [positions]);
+  /** Mirror ref cho journal — dùng khi đẩy account-state định kỳ (nấc 2) */
+  const journalRef = useRef<JournalEntry[]>([]);
+  useEffect(() => {
+    journalRef.current = journal;
+  }, [journal]);
   /** Persist vị thế đang mở — F5 không mất lệnh */
   useEffect(() => {
     savePositions(positions);
@@ -114,6 +120,30 @@ export const App: React.FC = () => {
   useEffect(() => {
     saveJournal(journal);
   }, [journal]);
+
+  // Đẩy trạng thái tài khoản lên server định kỳ 15' (nấc 2: agent-brief đọc).
+  // Fire-and-forget; server chưa cấu hình → serverSync tự im lặng.
+  // Đọc qua ref để luôn tươi (effect chạy 1 lần).
+  useEffect(() => {
+    const push = () => {
+      const js = journalRef.current;
+      const ps = positionsRef.current;
+      const realized = realizedPnlUsd(js);
+      const floating = Number(ps.reduce((a, p) => a + (p.pnl || 0), 0).toFixed(2));
+      const bal = loadStartBalance();
+      pushAccountState({
+        startBalance: bal,
+        realizedPnl: realized,
+        equity: Number((bal + realized + floating).toFixed(2)),
+        floatingPnl: floating,
+        openCount: ps.length,
+        usedMargin: Number(ps.reduce((a, p) => a + positionMargin(p), 0).toFixed(2)),
+      });
+    };
+    const t = setTimeout(push, 10000); // đẩy 1 lần sau khi app ổn định
+    const iv = setInterval(push, 15 * 60 * 1000);
+    return () => { clearTimeout(t); clearInterval(iv); };
+  }, []);
 
   // Toast khi lưới lọc chặn tick ảo (throttle 5 phút để không spam)
   useEffect(() => {
@@ -293,6 +323,8 @@ export const App: React.FC = () => {
     }
 
     setPositions((prev) => [...prev, ...newPositions]);
+    // Dual-write lên kho server (nấc 2) — fire-and-forget, local vẫn là source khi server chưa cấu hình
+    pushOpenedPositions(newPositions, getDeviceId());
     // Đẩy lên kho chia sẻ khi MỞ lệnh (nếu đang trong nhóm)
     try {
       if (getGroupId()) {
@@ -340,6 +372,8 @@ export const App: React.FC = () => {
       : px;
     const entry = entryFromPosition(pos, outcome, exitPrice, digits, closeMethod, closeNote);
     setJournal((prev) => [...prev, entry]);
+    // Dual-write đóng lệnh lên kho server (nấc 2)
+    pushClosedPosition(id, outcome, exitPrice, closeNote);
     // Đẩy lên kho chia sẻ nếu đang trong nhóm (đa thiết bị)
     try {
       if (getGroupId()) {
@@ -367,6 +401,9 @@ export const App: React.FC = () => {
           : p
       )
     );
+    // Dual-write cấu hình auto-close lên server (nấc 2)
+    const cur = positionsRef.current.find((p) => p.id === id);
+    pushUpdatedPosition(id, { autoClose: { ...(cur?.autoClose || {}), ...patch } });
   };
 
   // Engine BOT tự đóng lệnh: chạm TP/SL hoặc quá time-stop (chạy mỗi khi giá tick).
@@ -435,6 +472,9 @@ export const App: React.FC = () => {
     setPositions((prev) =>
       prev.map((p) => (p.id === id ? { ...p, sl: p.entryPrice } : p))
     );
+    // Dual-write dời SL lên server (nấc 2)
+    const cur = positionsRef.current.find((p) => p.id === id);
+    if (cur) pushUpdatedPosition(id, { sl: cur.entryPrice });
     showToast('Đã dời Stop Loss về hòa vốn (BE). Giao dịch an toàn!');
   };
 
