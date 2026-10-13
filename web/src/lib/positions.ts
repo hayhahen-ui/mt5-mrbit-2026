@@ -67,7 +67,7 @@ export const LEVERAGE = 100;
  * - Vàng (XAUUSD): 1 lot = 100 oz → margin = lot × 100 × giá / 100 = lot × giá
  * - Crypto (BTCUSD): 1 lot = 1 coin → margin = lot × giá / 100
  */
-export function positionMargin(p: Position): number {
+export function positionMargin(p: Pick<Position, 'symbol' | 'lot' | 'entryPrice'>): number {
   const { symbol, lot, entryPrice } = p;
   if (symbol === 'XAUUSD') return (lot * 100 * entryPrice) / LEVERAGE; // 1 lot = 100 oz
   if (symbol === 'BTCUSD' || symbol === 'ETHUSD') return (lot * entryPrice) / LEVERAGE; // 1 lot = 1 coin

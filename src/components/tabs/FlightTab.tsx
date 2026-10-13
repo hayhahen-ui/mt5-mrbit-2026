@@ -80,7 +80,7 @@ export const FlightTab: React.FC<FlightTabProps> = ({
     setPlan((p) => ({ ...p, [k]: v }));
 
   const pipSize = pipSizeOf(asset.symbol);
-  const usdPip = usdPerPipPerLot(asset.symbol);
+  const usdPip = usdPerPipPerLot(asset.symbol, asset.price); // JPY cần giá thật (1000/giá), không dùng fallback
   const entry = signal.entryPrice;
   const planLot = Math.max(0.01, parseFloat(plan.lot) || 0);
   const planSL = parseFloat(plan.sl);

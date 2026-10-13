@@ -1,4 +1,5 @@
 import { JournalEntry, JournalOutcome, JournalStats, Position } from '../types';
+import { pipSizeOf } from './account';
 
 const STORAGE_KEY = 'nexuspilot-journal-v1';
 
@@ -61,11 +62,13 @@ export function entryFromPosition(
   closeNote?: string
 ): JournalEntry {
   const rMultiple = outcome === 'BE' ? 0 : calcRMultiple(pos.type, pos.entryPrice, pos.sl, exitPrice);
-  const pipSize = pos.symbol.includes('JPY') ? 0.01 : 0.0001; // JPY: 0.01, còn lại chuẩn hoá (crypto/metals hiển thị theo pip forex)
+  // Dùng pipSizeOf dùng chung (account.ts): JPY 0.01, forex 0.0001, vàng/crypto/chỉ số 0.1.
+  // Trước đây hardcode 0.0001 cho mọi mã không phải JPY → cột pips của XAU/BTC/ETH/US30 sai hàng nghìn lần.
+  const pipSize = pipSizeOf(pos.symbol);
   const pips = Number((((pos.type === 'BUY' ? exitPrice - pos.entryPrice : pos.entryPrice - exitPrice)) / pipSize).toFixed(1));
   const now = new Date().toISOString();
   return {
-    id: `J-${Date.now()}-${pos.tier}`,
+    id: `J-${Date.now()}-${pos.tier}-${Math.random().toString(36).slice(2, 7)}`,
     symbol: pos.symbol,
     direction: pos.type,
     engine: pos.engine || 'SMC',

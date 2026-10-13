@@ -28,7 +28,7 @@ import { DashboardStrip } from './components/DashboardStrip';
 import { findLatestKaizenFor, linkKaizenOutcome, clearKaizen, loadKaizen } from './lib/kaizen';
 import { resetAllLocalData, markResetTime, getResetMark } from './lib/reset';
 import { loadStartBalance, saveStartBalance, realizedPnlUsd } from './lib/account';
-import { loadPositions, savePositions, DEFAULT_AUTO_CLOSE, POSITIONS_KEY } from './lib/positions';
+import { loadPositions, savePositions, DEFAULT_AUTO_CLOSE, POSITIONS_KEY, positionMargin } from './lib/positions';
 
 /** Mặc định tự động đóng cho lệnh mới — lưu localStorage */
 const AUTO_DEFAULT_KEY = 'nexuspilot-autoclose-default-v1';
@@ -282,6 +282,16 @@ export const App: React.FC = () => {
       mkPos('TP3', lot3, sig.tp3, 3)
     ].filter((x): x is Position => x !== null);
 
+    // Chặn mở lệnh khi margin vượt vốn khả dụng (equity - margin đang dùng).
+    // Trước đây app chỉ hiển thị margin mà không chặn → có thể mở vượt vốn.
+    const usedMargin = positionsRef.current.reduce((a, p) => a + positionMargin(p), 0);
+    const needMargin = newPositions.reduce((a, p) => a + positionMargin(p), 0);
+    const freeMargin = liveEquity - usedMargin;
+    if (needMargin > freeMargin) {
+      showToast(`⛔ Vốn không đủ: cần $${needMargin.toFixed(2)} margin, khả dụng $${Math.max(0, freeMargin).toFixed(2)} (equity $${liveEquity.toFixed(2)}). Giảm lot hoặc đóng bớt lệnh.`);
+      return;
+    }
+
     setPositions((prev) => [...prev, ...newPositions]);
     // Đẩy lên kho chia sẻ khi MỞ lệnh (nếu đang trong nhóm)
     try {
@@ -293,7 +303,7 @@ export const App: React.FC = () => {
         }))).catch(() => { /* lặng lẽ */ });
       }
     } catch { /* noop */ }
-    showToast(`⚡ 1-Click: Đã mở 3 vị thế ${sig.direction} #${sig.symbol} (TP1 50%, TP2 30%, TP3 20%)`);
+    showToast(`⚡ 1-Click: Đã mở ${newPositions.length} vị thế ${sig.direction} #${sig.symbol} (TP1 50%, TP2 30%, TP3 20%)`);
   };
 
   const handleClosePosition = (id: string) => {
@@ -310,20 +320,24 @@ export const App: React.FC = () => {
     id: string,
     outcome: JournalOutcome,
     closeMethod: 'tay' | 'auto' = 'tay',
-    closeNote?: string
+    closeNote?: string,
+    livePrice?: number
   ) => {
     const pos = positionsRef.current.find((p) => p.id === id);
     if (!pos) return;
     const asset = assets.find((a) => a.symbol === pos.symbol);
     const digits = asset ? asset.digits : 2;
+    // Giá thoát ưu tiên giá live truyền vào (auto-close tính tươi, không mutate state),
+    // fallback về pos.currentPrice cho các đường đóng tay.
+    const px = livePrice ?? pos.currentPrice;
     // Ăn-non/cắt-lỗ-sớm: closeNote chứa 'ăn-non'/'cắt-lỗ-sớm' → dùng giá hiện tại, KHÔNG dùng pos.tp/pos.sl
     const isEarly = closeNote && (closeNote.includes('ăn-non') || closeNote.includes('cắt-lỗ-sớm'));
     const exitPrice =
-      isEarly ? pos.currentPrice
+      isEarly ? px
       : outcome === 'TP' ? pos.tp
       : outcome === 'SL' ? pos.sl
       : outcome === 'BE' ? pos.entryPrice
-      : pos.currentPrice;
+      : px;
     const entry = entryFromPosition(pos, outcome, exitPrice, digits, closeMethod, closeNote);
     setJournal((prev) => [...prev, entry]);
     // Đẩy lên kho chia sẻ nếu đang trong nhóm (đa thiết bị)
@@ -369,28 +383,28 @@ export const App: React.FC = () => {
       if (cur.dataSource === 'OFFLINE') continue; // chưa có giá thật sau khi tải trang
       if (nowTs - (cur.updatedAt || 0) > PRICE_STALE_MS) continue; // giá quá cũ
       const px = cur.price;
-      p.currentPrice = px; // đồng bộ giá thoát cho bản ghi sổ
-      // Tính P&L TƯƠI tại đây (p.pnl từ setPositions bất đồng bộ → stale, không kịp cắt ở ngưỡng $)
+      // Tính P&L TƯƠI tại đây (p.pnl từ setPositions bất đồng bộ → stale, không kịp cắt ở ngưỡng $).
+      // KHÔNG mutate p.currentPrice/p.pnl trực tiếp (anti-pattern React) — giá live được
+      // truyền tường minh vào handleCloseWithOutcome; hiển thị dùng state do floating updater set.
       const diffLive = p.type === 'BUY' ? px - p.entryPrice : p.entryPrice - px;
       const isJpyLive = p.symbol.includes('JPY');
       const pipSizeLive = isJpyLive ? 0.01 : cur.category === 'Forex' ? 0.0001 : 0.1;
       const usdPerPipLive = isJpyLive ? 1000 / px : cur.category === 'Forex' ? 10 : 0.1; // crypto: 1 pip = $0.10/lot
       const pnlLive = (diffLive / pipSizeLive) * p.lot * usdPerPipLive;
-      p.pnl = Number(pnlLive.toFixed(2));
       const hitTp = p.type === 'BUY' ? px >= p.tp : px <= p.tp;
       const hitSl = p.type === 'BUY' ? px <= p.sl : px >= p.sl;
       // ĂN NON / CẮT LỖ SỚM dùng pnlLive — ưu tiên cao nhất
       if (ac.tpUsd != null && ac.tpUsd > 0 && pnlLive >= ac.tpUsd) {
-        handleCloseWithOutcome(p.id, 'TP', 'auto', `ăn-non +$${ac.tpUsd}`);
+        handleCloseWithOutcome(p.id, 'TP', 'auto', `ăn-non +$${ac.tpUsd}`, px);
       } else if (ac.slUsd != null && ac.slUsd > 0 && pnlLive <= -ac.slUsd) {
-        handleCloseWithOutcome(p.id, 'SL', 'auto', `cắt-lỗ-sớm -$${ac.slUsd}`);
+        handleCloseWithOutcome(p.id, 'SL', 'auto', `cắt-lỗ-sớm -$${ac.slUsd}`, px);
       } else if (ac.tp && hitTp) {
-        handleCloseWithOutcome(p.id, 'TP', 'auto', 'auto-TP');
+        handleCloseWithOutcome(p.id, 'TP', 'auto', 'auto-TP', px);
       } else if (ac.sl && hitSl) {
-        handleCloseWithOutcome(p.id, 'SL', 'auto', 'auto-SL');
+        handleCloseWithOutcome(p.id, 'SL', 'auto', 'auto-SL', px);
       } else if (ac.timeStopMin && nowTs - (p.openedAt || nowTs) >= ac.timeStopMin * 60000) {
         const lbl = ac.timeStopMin >= 60 ? `${ac.timeStopMin / 60}h` : `${ac.timeStopMin}m`;
-        handleCloseWithOutcome(p.id, 'TIME', 'auto', `time-stop ${lbl}`);
+        handleCloseWithOutcome(p.id, 'TIME', 'auto', `time-stop ${lbl}`, px);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
