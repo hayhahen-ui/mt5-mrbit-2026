@@ -436,9 +436,9 @@ export const FlightTab: React.FC<FlightTabProps> = ({
       <div>
           <button
             onClick={fireOneClick}
-            disabled={!!planError}
+            disabled={!!planError || signal.direction === 'FLAT'}
             className={`py-3 px-6 rounded-xl font-bold text-sm tracking-wide transition-all shadow-lg flex items-center gap-2 ${
-              planError
+              planError || signal.direction === 'FLAT'
                 ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                 : isBuy
                   ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/50 hover:scale-[1.02]'
@@ -446,7 +446,7 @@ export const FlightTab: React.FC<FlightTabProps> = ({
             }`}
           >
             <Zap size={18} />
-            1-CLICK {signal.direction} NOW
+            {signal.direction === 'FLAT' ? 'KHÔNG CÓ TÍN HIỆU' : `1-CLICK ${signal.direction} NOW`}
           </button>
         </div>
       </div>

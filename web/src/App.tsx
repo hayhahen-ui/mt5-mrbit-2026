@@ -221,6 +221,12 @@ export const App: React.FC = () => {
 
   // 1-Click Order Execution: 3-Tier Split
   const handleExecuteTrade = (sig: Signal, totalLot: number) => {
+    // Chặn mở lệnh từ tín hiệu FLAT — ép kiểu 'as' trước đây tạo vị thế type='FLAT'
+    // khiến P&L tính sai chiều (rơi vào nhánh SELL) và journal ghi direction vô nghĩa.
+    if (sig.direction !== 'BUY' && sig.direction !== 'SELL') {
+      showToast(`⛔ Không mở lệnh: tín hiệu #${sig.symbol} đang FLAT (không có chiều).`);
+      return;
+    }
     // Chia 3 tầng nhưng mỗi tầng tối thiểu 0.01; nếu totalLot < 0.03 thì dồn hết vào TP1
     let lot1: number, lot2: number, lot3: number;
     if (totalLot < 0.03) {
