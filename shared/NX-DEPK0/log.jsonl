@@ -114,3 +114,4 @@
 {"ts":1791884216259,"type":"position_open","symbol":"BTCUSD","direction":"BUY","entry":83394.2,"exit":null,"lot":0.01,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP1 TP:83435.9 SL:83352.5","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1791884242380,"type":"trade","symbol":"BTCUSD","direction":"BUY","entry":83394.2,"exit":83435.9,"lot":0.01,"pnl":null,"rMultiple":1,"outcome":"TP","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1791886041613,"type":"trade","symbol":"EURUSD","direction":"SELL","entry":1.1182,"exit":1.11794,"lot":0.02,"pnl":null,"rMultiple":0.46,"outcome":"TIME","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
+{"ts":1791888098380,"type":"position_open","symbol":"EURUSD","direction":"BUY","entry":1.11837,"exit":null,"lot":0.02,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP1 TP:1.11893 SL:1.11781","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
