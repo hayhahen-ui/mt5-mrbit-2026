@@ -35,6 +35,7 @@ export interface BenchmarkStrategy {
   name: string; // vd 'Vantage #1533098'
   source: BenchmarkSource;
   sourceNote?: string;
+  sourceUrl?: string; // link gốc (vd link Vantage) — để nhận diện trùng
   createdAt: string; // ISO
   trades: BenchmarkTrade[];
 }
@@ -246,4 +247,95 @@ export function benchmarkEquityCurveUsd(trades: BenchmarkTrade[]): { x: number; 
 export function filterTradesByCutoff(trades: BenchmarkTrade[], cutoffMs: number): BenchmarkTrade[] {
   if (!cutoffMs) return trades;
   return trades.filter((t) => new Date(t.closeTime).getTime() >= cutoffMs);
+}
+
+// ── Server-side (Supabase qua api-server Render) ─────────────────────────────
+// App ưu tiên đọc server (đa thiết bị, online); rớt mạng → dùng localStorage.
+
+const serverBase = (): string => {
+  try {
+    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || '';
+    return String(u).replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+};
+
+export const benchmarkServerOn = (): boolean => !!serverBase();
+
+/** Parse link Vantage copy trading → { strategyId } | null */
+export function parseVantageLink(url: string): { strategyId: string } | null {
+  const m = String(url || '').match(/[?&]strategyId=(\d+)/);
+  return m ? { strategyId: m[1] } : null;
+}
+
+/** GET /api/benchmarks — null khi server chưa sẵn sàng */
+export async function fetchBenchmarksServer(): Promise<BenchmarkStrategy[] | null> {
+  const base = serverBase();
+  if (!base) return null;
+  try {
+    const r = await fetch(`${base}/api/benchmarks`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && Array.isArray(j.strategies) ? j.strategies : null;
+  } catch {
+    return null;
+  }
+}
+
+/** POST /api/benchmarks — tạo strategy trên server */
+export async function createBenchmarkServer(input: {
+  name: string;
+  source: BenchmarkSource;
+  sourceNote?: string;
+  sourceUrl?: string;
+  id?: string;
+}): Promise<BenchmarkStrategy | null> {
+  const base = serverBase();
+  if (!base) return null;
+  try {
+    const r = await fetch(`${base}/api/benchmarks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok ? j.strategy : null;
+  } catch {
+    return null;
+  }
+}
+
+/** POST /api/benchmark-trades — đẩy bulk trades lên server */
+export async function pushBenchmarkTradesServer(
+  strategyId: string,
+  trades: BenchmarkTrade[]
+): Promise<{ inserted: number; conflicted: number; skipped: number } | null> {
+  const base = serverBase();
+  if (!base) return null;
+  try {
+    const r = await fetch(`${base}/api/benchmark-trades`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategyId, trades }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok ? { inserted: j.inserted || 0, conflicted: j.conflicted || 0, skipped: j.skipped || 0 } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** DELETE /api/benchmarks?id= — xóa strategy trên server */
+export async function deleteBenchmarkServer(id: string): Promise<boolean> {
+  const base = serverBase();
+  if (!base) return false;
+  try {
+    const r = await fetch(`${base}/api/benchmarks?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return r.ok;
+  } catch {
+    return false;
+  }
 }

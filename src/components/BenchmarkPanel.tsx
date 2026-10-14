@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Scale, Plus, Trash2, Upload } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Scale, Plus, Trash2, Upload, Link2, Cloud, HardDrive } from 'lucide-react';
 import { JournalStats } from '../types';
 import {
   BenchmarkSource,
@@ -7,12 +7,18 @@ import {
   BENCHMARK_SOURCE_LABEL,
   MAX_TRADES_PER_STRATEGY,
   benchmarkEquityCurveR,
+  benchmarkServerOn,
   calcBenchmarkStats,
+  createBenchmarkServer,
   createStrategy,
+  deleteBenchmarkServer,
+  fetchBenchmarksServer,
   filterTradesByCutoff,
   loadBenchmarks,
   maxDrawdown,
   parseBenchmarkCsv,
+  parseVantageLink,
+  pushBenchmarkTradesServer,
   saveBenchmarks,
 } from '../lib/benchmark';
 import { fmtUsd } from '../lib/account';
@@ -42,15 +48,36 @@ function MetricRow({ label, sys, bm, better }: { label: string; sys: string; bm:
 export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, systemCurve, systemUsd, cutoff, range }) => {
   const [strategies, setStrategies] = useState<BenchmarkStrategy[]>(() => loadBenchmarks());
   const [selectedId, setSelectedId] = useState<string | null>(() => loadBenchmarks()[0]?.id ?? null);
+  const [fromServer, setFromServer] = useState(false);
+  const [loading, setLoading] = useState(benchmarkServerOn());
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
   const [newSource, setNewSource] = useState<BenchmarkSource>('vantage-copy');
   const [newNote, setNewNote] = useState('');
+  const [link, setLink] = useState('');
+  const [linkMsg, setLinkMsg] = useState('');
   const [csv, setCsv] = useState('');
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
   const [csvInfo, setCsvInfo] = useState('');
 
-  const persist = (list: BenchmarkStrategy[]) => {
+  // Ưu tiên đọc server (đa thiết bị); rớt → dùng cache localStorage
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const remote = await fetchBenchmarksServer();
+      if (!alive) return;
+      if (remote) {
+        setStrategies(remote);
+        saveBenchmarks(remote);
+        setFromServer(true);
+        setSelectedId((cur) => (remote.find((s) => s.id === cur) ? cur : remote[0]?.id ?? null));
+      }
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const cacheLocal = (list: BenchmarkStrategy[]) => {
     setStrategies(list);
     saveBenchmarks(list);
     if (selectedId && !list.find((s) => s.id === selectedId)) {
@@ -63,22 +90,52 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
   const bm = useMemo(() => calcBenchmarkStats(bmTrades), [bmTrades]);
   const bmCurve = useMemo(() => benchmarkEquityCurveR(bmTrades), [bmTrades]);
 
-  const handleAdd = () => {
-    const st = createStrategy(newName || `Benchmark ${strategies.length + 1}`, newSource, newNote);
+  const addStrategy = async (input: { name: string; source: BenchmarkSource; sourceNote?: string; sourceUrl?: string }) => {
+    const remote = await createBenchmarkServer(input);
+    const st: BenchmarkStrategy = remote ?? createStrategy(input.name, input.source, input.sourceNote);
+    if (remote && input.sourceUrl) st.sourceUrl = input.sourceUrl;
     const list = [...strategies, st];
-    persist(list);
+    cacheLocal(list);
     setSelectedId(st.id);
+    return st;
+  };
+
+  const handleAdd = async () => {
+    await addStrategy({ name: newName || `Benchmark ${strategies.length + 1}`, source: newSource, sourceNote: newNote });
     setNewName(''); setNewNote(''); setShowAdd(false);
   };
 
-  const handleDelete = (id: string) => {
+  /** Dán link Vantage → tự tạo strategy (auto-flow: chat cũng dùng cùng logic) */
+  const handleLink = async () => {
+    setLinkMsg('');
+    const parsed = parseVantageLink(link);
+    if (!parsed) {
+      setLinkMsg('Link không chứa strategyId — kiểm tra lại đường dẫn Vantage.');
+      return;
+    }
+    if (strategies.some((s) => s.sourceUrl === link.trim() || s.name === `Vantage #${parsed.strategyId}`)) {
+      setLinkMsg(`Strategy Vantage #${parsed.strategyId} đã có trong danh sách.`);
+      return;
+    }
+    const st = await addStrategy({
+      name: `Vantage #${parsed.strategyId}`,
+      source: 'vantage-copy',
+      sourceUrl: link.trim(),
+      sourceNote: 'Tạo tự động từ link — dữ liệu lệnh sẽ được assistant nhập sau khi fetch.',
+    });
+    setLink('');
+    setLinkMsg(`Đã tạo "${st.name}" — dán link trong chat để assistant tự fetch lệnh.`);
+  };
+
+  const handleDelete = async (id: string) => {
     const st = strategies.find((s) => s.id === id);
     if (!st) return;
     if (!window.confirm(`Xóa strategy tham chiếu "${st.name}" và toàn bộ ${st.trades.length} lệnh?`)) return;
-    persist(strategies.filter((s) => s.id !== id));
+    await deleteBenchmarkServer(id);
+    cacheLocal(strategies.filter((s) => s.id !== id));
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     setCsvErrors([]); setCsvInfo('');
     if (!selected) return;
     const { trades, errors } = parseBenchmarkCsv(csv);
@@ -90,10 +147,12 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
       setCsvErrors(['Không có dòng hợp lệ để nhập.']);
       return;
     }
-    const updated = { ...selected, trades: [...selected.trades, ...trades] };
-    persist(strategies.map((s) => (s.id === selected.id ? updated : s)));
+    const pushed = await pushBenchmarkTradesServer(selected.id, trades);
+    const updated: BenchmarkStrategy = { ...selected, trades: [...selected.trades, ...trades] };
+    void pushed;
+    cacheLocal(strategies.map((s) => (s.id === selected.id ? updated : s)));
     setCsvErrors(errors);
-    setCsvInfo(`Đã nhập ${trades.length} lệnh vào "${selected.name}"${errors.length ? ` (${errors.length} dòng lỗi)` : ''}.`);
+    setCsvInfo(`Đã nhập ${trades.length} lệnh vào "${selected.name}"${errors.length ? ` (${errors.length} dòng lỗi)` : ''}${fromServer ? ' · đã đồng bộ server' : ''}.`);
     setCsv('');
   };
 
@@ -103,7 +162,6 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
     return a > b ? 'sys' as const : 'bm' as const;
   };
 
-  // Điểm vẽ overlay 2 đường cong R
   const overlayMaxY = Math.max(1, ...systemCurve.map((p) => Math.abs(p.y)), ...bmCurve.map((p) => Math.abs(p.y)));
   const toPoints = (curve: { x: number; y: number }[]) =>
     curve.map((p, i) => {
@@ -123,6 +181,9 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
         <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
           <Scale size={16} className="text-amber-400" />
           ĐỐI ỨNG BENCHMARK — SO VỚI STRATEGY THAM CHIẾU
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${fromServer ? 'text-emerald-400 border-emerald-800/60' : 'text-slate-500 border-[#1e2b48]'}`}>
+            {loading ? '…' : fromServer ? (<span className="inline-flex items-center gap-1"><Cloud size={10} /> SERVER</span>) : (<span className="inline-flex items-center gap-1"><HardDrive size={10} /> LOCAL</span>)}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           {strategies.length > 0 && (
@@ -144,6 +205,34 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
           >
             <Plus size={13} /> Thêm strategy
           </button>
+        </div>
+      </div>
+
+      {/* Dán link Vantage → auto tạo strategy */}
+      <div className="bg-[#0b0f19] border border-[#1e2b48] rounded-xl p-3.5 space-y-2">
+        <div className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+          <Link2 size={13} className="text-sky-400" />
+          DÁN LINK VANTAGE — TỰ TẠO STRATEGY
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://secure.vantagemarkets.com/copyTrading/visitor/discover/discoverDetail?strategyId=..."
+            spellCheck={false}
+            className="flex-1 bg-[#080c14] border border-[#1e2b48] rounded-lg px-3 py-2 text-[11px] font-mono text-slate-200 placeholder:text-slate-600"
+          />
+          <button
+            onClick={handleLink}
+            disabled={!link.trim()}
+            className="py-2 px-4 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:opacity-40 text-slate-950 font-bold text-xs whitespace-nowrap"
+          >
+            TẠO TỪ LINK
+          </button>
+        </div>
+        {linkMsg && <div className="text-[11px] font-mono text-slate-400">{linkMsg}</div>}
+        <div className="text-[10px] text-slate-500 font-mono">
+          App tách strategyId từ link và tạo strategy ngay. Dữ liệu lệnh: dán trong chat để assistant tự fetch (đã lưu đăng nhập Vantage) rồi đẩy lên server.
         </div>
       </div>
 
@@ -180,8 +269,8 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
 
       {strategies.length === 0 && !showAdd ? (
         <div className="text-xs text-slate-500 bg-[#0b0f19] p-4 rounded-lg border border-[#1e2b48] text-center">
-          Chưa có strategy tham chiếu nào. Bấm "Thêm strategy" để tạo — vd strategy copy trading Vantage —
-          rồi dán lịch sử lệnh (CSV) vào bên dưới để so sánh với hệ thống.
+          Chưa có strategy tham chiếu nào. Dán link Vantage ở trên hoặc bấm "Thêm strategy" —
+          rồi nhập lịch sử lệnh (CSV) để so sánh với hệ thống.
         </div>
       ) : selected ? (
         <>
@@ -190,7 +279,6 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
             {selected.sourceNote ? ` · ${selected.sourceNote}` : ''} · Khoảng so sánh: {range}
           </div>
 
-          {/* Bảng so sánh */}
           <div className="bg-[#0b0f19] rounded-xl border border-[#1e2b48] p-4">
             <div className="flex items-center justify-between py-1.5 border-b border-[#1e2b48] font-mono text-[11px] font-bold">
               <span className="text-slate-500 w-32">CHỈ SỐ</span>
@@ -207,7 +295,6 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
             <MetricRow label="Max DD ($)" sys="—" bm={`${fmtUsd(bm.maxDrawdownUsd)}`} />
           </div>
 
-          {/* Delta kaizen — chỉ nêu chênh lệch thật */}
           {bm.total > 0 && (
             <div className="text-xs font-mono text-slate-300 bg-[#0b0f19] border border-[#1e2b48] rounded-lg p-3">
               <span className="text-purple-400 font-bold">KAIZEN GỢI Ý: </span>
@@ -218,7 +305,6 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
             </div>
           )}
 
-          {/* Overlay đường cong R */}
           <div className="space-y-2">
             <div className="flex items-center gap-4 text-[11px] font-mono">
               <span className="font-bold text-slate-300">ĐƯỜNG CONG R — OVERLAY</span>
@@ -248,7 +334,6 @@ export const BenchmarkPanel: React.FC<BenchmarkPanelProps> = ({ systemStats, sys
             </div>
           </div>
 
-          {/* Nhập lệnh CSV */}
           <div className="bg-[#0b0f19] rounded-xl border border-[#1e2b48] p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold text-slate-300">NHẬP LỊCH SỬ LỆNH (CSV)</div>
