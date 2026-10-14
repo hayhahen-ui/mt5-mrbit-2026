@@ -16,6 +16,7 @@ import accountState from '../api/account-state.js';
 import agentBrief from '../api/agent-brief.js';
 import benchmarks from '../api/benchmarks.js';
 import benchmarkTrades from '../api/benchmark-trades.js';
+import kaizen from '../api/kaizen.js';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -42,6 +43,7 @@ mount('/api/account-state', accountState);
 mount('/api/agent-brief', agentBrief);
 mount('/api/benchmarks', benchmarks);
 mount('/api/benchmark-trades', benchmarkTrades);
+mount('/api/kaizen', kaizen);
 
 app.get('/healthz', (_req, res) => res.json({ ok: true, service: 'mt5-mrbit-2026-api' }));
 

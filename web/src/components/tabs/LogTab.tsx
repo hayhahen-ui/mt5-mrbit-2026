@@ -8,6 +8,7 @@ import { fmtLocalTime } from '../../lib/time';
 import { entryPnlUsd, fmtUsd, realizedPnlUsd } from '../../lib/account';
 import { SharedPanel } from '../SharedPanel';
 import { BenchmarkPanel } from '../BenchmarkPanel';
+import { KaizenEnginePanel } from '../KaizenEnginePanel';
 
 interface LogTabProps {
   journal: JournalEntry[];
@@ -424,6 +425,9 @@ ${rows}
           </>
         )}
       </div>
+
+      {/* KAIZEN ENGINE — sinh finding từ dữ liệu thật → kho kiến thức */}
+      <KaizenEnginePanel journal={fj} kaizen={kaizen} />
 
       {/* Export + Xóa sổ + Reset toàn bộ */}
       <div className="glass-panel p-5 flex flex-wrap items-center justify-between gap-4">
