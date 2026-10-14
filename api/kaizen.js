@@ -29,10 +29,12 @@ const toFinding = (r) => ({
   severity: r.severity, kind: r.kind, status: r.status,
   sampleSize: Number(r.sample_size) || 0, createdAt: new Date(r.created_at).getTime(),
 });
+const EFFECT = ['block', 'warn', 'research'];
 const toKnowledge = (r) => ({
   id: r.id, rule: r.rule, conditions: r.conditions || [],
   confidence: r.confidence, sampleSize: Number(r.sample_size) || 0,
-  label: r.label, source: r.source || '', active: !!r.active,
+  label: r.label, effect: EFFECT.includes(r.effect) ? r.effect : 'research',
+  source: r.source || '', active: !!r.active,
   createdAt: new Date(r.created_at).getTime(), updatedAt: new Date(r.updated_at).getTime(),
 });
 
@@ -65,6 +67,7 @@ export default async function handler(req, res) {
           confidence: pick(body.confidence, CONF, 'thap'),
           sample_size: Math.max(0, Number(body.sampleSize) || 0),
           label: pick(body.label, LABEL, 'SUY_LUAN'),
+          effect: pick(body.effect, EFFECT, 'research'),
           source: String(body.source || '').slice(0, 120),
           active: body.active !== false,
         };
@@ -103,6 +106,7 @@ export default async function handler(req, res) {
         const patch = { updated_at: new Date().toISOString() };
         if (typeof body.active === 'boolean') patch.active = body.active;
         if (body.label && LABEL.includes(body.label)) patch.label = body.label;
+        if (body.effect && EFFECT.includes(body.effect)) patch.effect = body.effect;
         const r = await fetch(`${url}/rest/v1/knowledge_entries?id=eq.${encodeURIComponent(id)}`, {
           method: 'PATCH', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),

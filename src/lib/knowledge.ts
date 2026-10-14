@@ -13,6 +13,8 @@ import type { KaizenFinding, FindingSeverity } from './kaizenEngine';
 
 export type KnowledgeLabel = 'FACT' | 'TINH_TOAN' | 'SUY_LUAN' | 'CHUA_XAC_MINH';
 export type Confidence = 'cao' | 'trung-binh' | 'thap';
+/** Tác dụng của luật trong cổng RADAR: block = chặn tín hiệu, warn = cảnh báo, research = chỉ theo dõi. */
+export type KnowledgeEffect = 'block' | 'warn' | 'research';
 
 export interface RuleCondition {
   field: string; // vd 'session' | 'symbol' | 'verdict' | 'newsHigh' | 'hour'
@@ -27,6 +29,7 @@ export interface KnowledgeEntry {
   confidence: Confidence;
   sampleSize: number;
   label: KnowledgeLabel;
+  effect: KnowledgeEffect; // mặc định 'research' — chỉ 'block'/'warn' mới qua cổng RADAR
   source: string; // id finding hoặc 'thu-cong'
   createdAt: number;
   updatedAt: number;
@@ -84,6 +87,7 @@ export function promoteFinding(
     confidence: conf,
     sampleSize: f.sampleSize,
     label: opts?.label || 'SUY_LUAN',
+    effect: 'research', // mặc định chỉ theo dõi — user nâng tay lên block/warn
     source: f.id,
     createdAt: now,
     updatedAt: now,
@@ -149,6 +153,7 @@ function seedIfEmpty(): void {
       confidence: 'trung-binh',
       sampleSize: 0,
       label: 'CHUA_XAC_MINH',
+      effect: 'research',
       source: 'de-xuat-14-10-2026',
       createdAt: now,
       updatedAt: now,

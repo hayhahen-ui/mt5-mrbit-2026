@@ -15,13 +15,10 @@ import {
   BenchmarkStrategy, BenchmarkStats, calcBenchmarkStats, loadBenchmarks,
   fetchBenchmarksServer, benchmarkServerOn, maxDrawdown,
 } from '../lib/benchmark';
-
-const API = (): string => {
-  try {
-    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || '';
-    return u ? u.replace(/\/$/, '') : '';
-  } catch { return ''; }
-};
+import {
+  postFindingServer, patchFindingServer, fetchKnowledgeServer,
+  postKnowledgeServer, patchKnowledgeServer,
+} from '../lib/kaizenServer';
 
 const FIND_KEY = 'nexuspilot-kaizen-findings-v1';
 const loadLocalFindings = (): KaizenFinding[] => {
@@ -34,61 +31,6 @@ const loadLocalFindings = (): KaizenFinding[] => {
 const saveLocalFindings = (l: KaizenFinding[]) => {
   try { localStorage.setItem(FIND_KEY, JSON.stringify(l.slice(-200))); } catch { /* giữ cũ */ }
 };
-
-async function postFindingServer(f: KaizenFinding): Promise<KaizenFinding | null> {
-  const base = API();
-  if (!base) return null;
-  try {
-    const r = await fetch(`${base}/api/kaizen`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'finding', ...f }),
-    });
-    const d = await r.json();
-    return d?.ok && d.finding ? { ...f, id: d.finding.id } : null;
-  } catch { return null; }
-}
-async function patchFindingServer(id: string, patch: Partial<KaizenFinding>): Promise<boolean> {
-  const base = API();
-  if (!base) return false;
-  try {
-    const r = await fetch(`${base}/api/kaizen`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'finding', id, ...patch }),
-    });
-    return (await r.json())?.ok === true;
-  } catch { return false; }
-}
-async function fetchKnowledgeServer(): Promise<KnowledgeEntry[] | null> {
-  const base = API();
-  if (!base) return null;
-  try {
-    const r = await fetch(`${base}/api/kaizen?type=knowledge`);
-    const d = await r.json();
-    return d?.ok ? d.knowledge : null;
-  } catch { return null; }
-}
-async function postKnowledgeServer(e: KnowledgeEntry): Promise<boolean> {
-  const base = API();
-  if (!base) return false;
-  try {
-    const r = await fetch(`${base}/api/kaizen`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'knowledge', ...e }),
-    });
-    return (await r.json())?.ok === true;
-  } catch { return false; }
-}
-async function patchKnowledgeServer(id: string, active: boolean): Promise<boolean> {
-  const base = API();
-  if (!base) return false;
-  try {
-    const r = await fetch(`${base}/api/kaizen`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'knowledge', id, active }),
-    });
-    return (await r.json())?.ok === true;
-  } catch { return false; }
-}
 
 const SEV_STYLE: Record<string, string> = {
   'cao': 'bg-rose-500/15 text-rose-300 border-rose-500/30',
@@ -173,8 +115,19 @@ export const KaizenEnginePanel: React.FC<Props> = ({ journal, kaizen }) => {
   };
 
   const toggleKnowledge = async (id: string, active: boolean) => {
-    await patchKnowledgeServer(id, active);
-    setKnowledge(active ? reactivateKnowledge(id) : deactivateKnowledge(id));
+    await patchKnowledgeServer(id, { active });
+    const next = (active ? reactivateKnowledge(id) : deactivateKnowledge(id)).map((k) =>
+      k.effect ? k : { ...k, effect: 'research' as const }
+    );
+    setKnowledge(next);
+  };
+
+  const setEffect = async (id: string, effect: 'block' | 'warn' | 'research') => {
+    if (!window.confirm(`Đặt luật này thành "${effect === 'block' ? 'CHẶN tín hiệu' : effect === 'warn' ? 'CẢNH BÁO' : 'chỉ NGHIÊN CỨU'}"? Luật CHẶN sẽ loại tín hiệu khỏi RADAR ngay khi khớp.`)) return;
+    await patchKnowledgeServer(id, { effect });
+    const next = loadKnowledge().map((k) => (k.id === id ? { ...k, effect, updatedAt: Date.now() } : k));
+    try { localStorage.setItem('nexuspilot-knowledge-v1', JSON.stringify(next)); } catch { /* giữ cũ */ }
+    setKnowledge(next.map((k) => (k.effect ? k : { ...k, effect: 'research' as const })));
   };
 
   const activeFindings = findings.filter((f) => f.status === 'moi' || f.status === 'dang-theo-doi');
@@ -247,8 +200,21 @@ export const KaizenEnginePanel: React.FC<Props> = ({ journal, kaizen }) => {
             <div key={k.id} className={`p-2.5 rounded-lg border text-[11px] ${k.active ? 'bg-[#0b0f19] border-[#1e2b48]' : 'bg-[#0b0f19]/50 border-[#1e2b48]/50 opacity-60'}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${k.label === 'FACT' ? 'text-emerald-300 border-emerald-500/40' : k.label === 'TINH_TOAN' ? 'text-sky-300 border-sky-500/40' : 'text-slate-400 border-slate-500/40'}`}>{k.label}</span>
+                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border font-bold ${(k.effect || 'research') === 'block' ? 'text-rose-300 border-rose-500/40 bg-rose-500/10' : (k.effect || 'research') === 'warn' ? 'text-amber-300 border-amber-500/40 bg-amber-500/10' : 'text-slate-400 border-slate-500/40'}`}>
+                  {(k.effect || 'research') === 'block' ? '🚫 CHẶN' : (k.effect || 'research') === 'warn' ? '⚠️ CẢNH BÁO' : '🔬 NGHIÊN CỨU'}
+                </span>
                 <span className="text-slate-200 font-bold">{k.rule}</span>
-                <button onClick={() => toggleKnowledge(k.id, !k.active)} className="ml-auto text-[10px] px-2 py-0.5 rounded bg-[#17223b] text-slate-400 border border-[#243356] hover:text-white">
+                <select
+                  value={k.effect || 'research'}
+                  onChange={(e) => setEffect(k.id, e.target.value as 'block' | 'warn' | 'research')}
+                  className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[#17223b] text-slate-300 border border-[#243356] cursor-pointer"
+                  title="Tác dụng trong cổng RADAR"
+                >
+                  <option value="research">🔬 Nghiên cứu</option>
+                  <option value="warn">⚠️ Cảnh báo</option>
+                  <option value="block">🚫 Chặn tín hiệu</option>
+                </select>
+                <button onClick={() => toggleKnowledge(k.id, !k.active)} className="text-[10px] px-2 py-0.5 rounded bg-[#17223b] text-slate-400 border border-[#243356] hover:text-white">
                   {k.active ? 'Tạm ngưng' : 'Kích hoạt lại'}
                 </button>
               </div>

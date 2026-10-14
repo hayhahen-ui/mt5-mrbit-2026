@@ -1,9 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Asset, DataSource, Signal, MarketSnapshot } from '../../types';
-import { Radar, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronDown, ScanSearch } from 'lucide-react';
+import { Radar, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronDown, ScanSearch, ShieldCheck, ShieldX, ShieldAlert } from 'lucide-react';
 import { totalScore, maxScore } from '../../lib/scoring';
 import { useDirectionScores, RESEARCH_SYMBOLS } from '../../lib/research/useDirectionScores';
 import { directionBadge } from '../../lib/research/directionScore';
+import { gateSignal, GateResult } from '../../lib/signalGate';
+import { KnowledgeEntry, loadKnowledge } from '../../lib/knowledge';
+import { fetchKnowledgeServer } from '../../lib/kaizenServer';
 
 interface RadarTabProps {
   assets: Asset[];
@@ -54,6 +57,32 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, snapshots, 
 
   const signalCount = assets.filter((a) => a.signalDir !== 'FLAT').length;
   const { scores: dirScores, fredLoaded } = useDirectionScores(signals);
+
+  /** Cổng RADAR (Phase C): tải kho kiến thức 1 lần, chấm từng tín hiệu */
+  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>(() => loadKnowledge());
+  useEffect(() => {
+    fetchKnowledgeServer().then((remote) => { if (remote) setKnowledge(remote); }).catch(() => {});
+  }, []);
+  const vnHour = useMemo(() => {
+    try {
+      return Number(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hour12: false }));
+    } catch { return new Date().getHours(); }
+  }, []);
+  const gateOf = (asset: Asset, sig?: Signal): GateResult | null => {
+    if (asset.signalDir !== 'BUY' && asset.signalDir !== 'SELL') return null;
+    const snap = snapshots[asset.symbol];
+    return gateSignal(
+      {
+        symbol: asset.symbol,
+        direction: asset.signalDir,
+        verdict: sig?.verdict,
+        session: snap?.session,
+        newsHigh: (snap?.newsNear?.length || 0) > 0,
+        hour: vnHour,
+      },
+      knowledge
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -112,6 +141,7 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, snapshots, 
             const factors = sig?.scoreBreakdown || pending || [];
             const sc = sig ? totalScore(sig.scoreBreakdown) : 0;
             const scMax = sig ? maxScore(sig.scoreBreakdown) : 0;
+            const gate = gateOf(asset, sig);
 
             return (
               <div
@@ -192,6 +222,22 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, snapshots, 
                     ) : (
                       <span className="text-slate-400">Đang quét...</span>
                     )}
+                    {/* Cổng RADAR — lọc nhiễu bằng kho kiến thức */}
+                    {gate && (
+                      <span
+                        title={gate.blocked ? gate.reasons.join(' | ') : gate.warnings.length ? gate.warnings.join(' | ') : 'Qua cổng kiểm duyệt'}
+                        className={`flex items-center gap-1 font-bold px-1.5 py-0.5 rounded text-[10px] border ${
+                          gate.blocked
+                            ? 'bg-rose-950 text-rose-300 border-rose-800'
+                            : gate.warnings.length
+                              ? 'bg-amber-950 text-amber-300 border-amber-800'
+                              : 'bg-emerald-950/50 text-emerald-500 border-emerald-900'
+                        }`}
+                      >
+                        {gate.blocked ? <ShieldX size={11} /> : gate.warnings.length ? <ShieldAlert size={11} /> : <ShieldCheck size={11} />}
+                        {gate.blocked ? 'CỔNG CHẶN' : gate.warnings.length ? 'CỔNG CẢNH BÁO' : 'QUA CỔNG'}
+                      </span>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -235,6 +281,14 @@ export const RadarTab: React.FC<RadarTabProps> = ({ assets, signals, snapshots, 
                       <div className="text-[10px] text-slate-500">
                         Engine: <span className="text-slate-300">{sig.engineName}</span>
                         {sig.rationale && <span className="text-slate-500"> — {sig.rationale}</span>}
+                      </div>
+                    )}
+                    {gate && (gate.blocked || gate.warnings.length > 0) && (
+                      <div className={`text-[10px] p-2 rounded-lg border ${gate.blocked ? 'bg-rose-950/40 border-rose-800 text-rose-300' : 'bg-amber-950/40 border-amber-800 text-amber-300'}`}>
+                        <span className="font-bold">{gate.blocked ? '🚫 Cổng RADAR chặn tín hiệu này:' : '⚠️ Cổng RADAR cảnh báo:'}</span>
+                        <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                          {[...gate.reasons, ...gate.warnings].map((r, i) => <li key={i}>{r}</li>)}
+                        </ul>
                       </div>
                     )}
                     {factors.length === 0 ? (

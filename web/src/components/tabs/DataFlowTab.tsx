@@ -75,7 +75,7 @@ const POS_API = (): string => {
   } catch { return ''; }
 };
 
-interface KzStatus { ok: boolean | null; detail: string; }
+interface KzStatus { ok: boolean | null; detail: string; blocks?: number; }
 
 export default function DataFlowTab() {
   const [statuses, setStatuses] = useState<Record<string, SourceStatus>>({});
@@ -135,13 +135,26 @@ export default function DataFlowTab() {
         return { ok: false, detail: e?.message || 'lỗi mạng' };
       }
     };
+    const getK = async (): Promise<KzStatus> => {
+      try {
+        const r = await fetch(`${base}/api/kaizen?type=knowledge`, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d?.ok) return { ok: false, detail: `HTTP ${r.status}` };
+        const arr = d.knowledge || [];
+        const blocks = arr.filter((x: any) => x.active && (x.effect || 'research') === 'block').length;
+        return {
+          ok: true,
+          detail: `${arr.filter((x: any) => x.active).length}/${arr.length} luật hiệu lực · ${blocks} chặn`,
+          blocks,
+        };
+      } catch (e: any) {
+        return { ok: false, detail: e?.message || 'lỗi mạng' };
+      }
+    };
     const [b, f, k] = await Promise.all([
       get('/api/benchmarks', (d) => `${d.strategies?.length ?? 0} strategy`),
       get('/api/kaizen?type=findings', (d) => `${d.findings?.length ?? 0} findings`),
-      get('/api/kaizen?type=knowledge', (d) => {
-        const arr = d.knowledge || [];
-        return `${arr.filter((x: any) => x.active).length}/${arr.length} luật hiệu lực`;
-      }),
+      getK(),
     ]);
     if (mounted.current) setKz({ benchmarks: b, findings: f, knowledge: k });
   }, []);
@@ -275,11 +288,15 @@ export default function DataFlowTab() {
               live={kz.knowledge?.ok === true}
             />
             <FlowNode title="Neural (shadow)" desc="quan sát · chưa can thiệp tín hiệu" live={true} />
-            <FlowNode title="Cổng RADAR" desc="Phase C — lọc nhiễu bằng knowledge + NN" live={false} />
+            <FlowNode
+              title="Cổng RADAR"
+              desc={kz.knowledge?.ok ? `✅ lọc nhiễu bằng knowledge${kz.knowledge.blocks ? ` · ${kz.knowledge.blocks} luật chặn` : ''}` : kz.knowledge?.detail || 'đang ping…'}
+              live={kz.knowledge?.ok === true}
+            />
           </FlowColumn>
         </div>
         <div className="mt-3 text-[10px] text-slate-500">
-          🔁 Vòng Kaizen khép kín: dữ liệu thật (cột 3) → đối ứng → finding → kho kiến thức → <span className="text-pink-300">Phase C: cổng RADAR</span> → tín hiệu sạch, win rate max.
+          🔁 Vòng Kaizen khép kín: dữ liệu thật (cột 3) → đối ứng → finding → kho kiến thức → <span className="text-pink-300">cổng RADAR</span> → tín hiệu sạch, win rate max.
         </div>
         <div className="mt-3 text-[10px] text-slate-500">
           💡 Đường chảy <span className="text-emerald-400">xanh chuyển động</span> = dữ liệu đang realtime ·
