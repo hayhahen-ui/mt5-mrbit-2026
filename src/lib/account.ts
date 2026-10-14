@@ -4,7 +4,7 @@
  * - Balance = vốn ban đầu + P&L đã thực hiện (tính từ sổ).
  * - Equity = Balance + P&L thả nổi của lệnh đang mở.
  */
-import { JournalEntry } from '../types';
+import type { JournalEntry } from '../types';
 
 const KEY = 'nexuspilot-account-v1';
 
@@ -18,11 +18,11 @@ export function isForexSymbol(symbol: string): boolean {
 }
 
 /** $/pip cho 1 lot — khớp công thức floating pnl trong App */
-/** $/pip cho 1 lot — khớp công thức floating pnl trong App */
 export function usdPerPipPerLot(symbol: string, price?: number): number {
   if (symbol.includes('JPY')) return price && price > 0 ? 1000 / price : 6.3; // ~1000/158
   if (isForexSymbol(symbol)) return 10;
-  return 0.1; // crypto/metals: 1 pip (0.1 giá) = $0.10/lot; XAUUSD riêng tính theo oz
+  if (symbol === 'XAUUSD') return 10; // vàng: 1 pip (0.1 $/oz) × 100 oz = $10/lot
+  return 0.1; // crypto/US30: 1 pip (0.1 giá) = $0.10/lot
 }
 
 /** XAUUSD đặc biệt: 1 lot = 100 oz → $/pip = $10 (pip 0.1 = $1/oz × 100) */
@@ -38,6 +38,20 @@ export function entryPnlUsd(e: JournalEntry): number {
   // XAUUSD: P&L = diff($/oz) × 100 oz × lot
   if (e.symbol === 'XAUUSD') return Number((diff * 100 * e.lot).toFixed(2));
   return Number((pips * e.lot * usdPerPipPerLot(e.symbol, e.exitPrice)).toFixed(2));
+}
+
+/**
+ * P&L $ THẢ NỔI — single source of truth cho floating updater + vòng auto-close.
+ * BẮT BUỘC dùng hàm này thay vì công thức inline (bug 14/10: công thức inline dùng
+ * $0.1/pip cho XAUUSD → đánh giá thấp 100 lần → cắt-lỗ-sớm -$2 không bao giờ kích hoạt).
+ */
+export function livePnlUsd(
+  symbol: string, type: 'BUY' | 'SELL', entryPrice: number, livePrice: number, lot: number
+): number {
+  const diff = type === 'BUY' ? livePrice - entryPrice : entryPrice - livePrice;
+  if (symbol === 'XAUUSD') return Number((diff * 100 * lot).toFixed(2));
+  const pips = diff / pipSizeOf(symbol);
+  return Number((pips * lot * usdPerPipPerLot(symbol, livePrice)).toFixed(2));
 }
 
 /** Tổng P&L đã thực hiện từ sổ */

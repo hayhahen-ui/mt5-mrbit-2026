@@ -16,7 +16,7 @@ import { ResearchTab } from './components/tabs/ResearchTab';
 import DataFlowTab from './components/tabs/DataFlowTab';
 import { getGroupId, getDeviceId, pushShared, lastPushedTs, markPushed } from './lib/groupSync';
 import { pushOpenedPositions, pushClosedPosition, pushUpdatedPosition, pushAccountState } from './lib/serverSync';
-import { entryPnlUsd } from './lib/account';
+import { entryPnlUsd, livePnlUsd, pipSizeOf } from './lib/account';
 import { LogTab } from './components/tabs/LogTab';
 import { JournalTab } from './components/tabs/JournalTab';
 import { HelpTab } from './components/tabs/HelpTab';
@@ -231,19 +231,16 @@ export const App: React.FC = () => {
         // nếu không thì đóng băng P&L cũ, không tính bằng giá mock.
         const fresh = curAsset.dataSource !== 'OFFLINE' && !!curAsset.updatedAt && Date.now() - curAsset.updatedAt < 15 * 60_000;
         if (!fresh) return p;
+        // Dùng livePnlUsd dùng chung (bug 14/10: công thức inline cũ đánh giá thấp XAUUSD 100 lần)
+        const pnl = livePnlUsd(p.symbol, p.type, p.entryPrice, curAsset.price, p.lot);
+        const pipSize = pipSizeOf(p.symbol);
         const diff = p.type === 'BUY' ? curAsset.price - p.entryPrice : p.entryPrice - curAsset.price;
-        const isJpy = p.symbol.includes('JPY');
-        // Pip: JPY = 0.01, forex khác = 0.0001, vàng/crypto = 0.1
-        const pipSize = isJpy ? 0.01 : curAsset.category === 'Forex' ? 0.0001 : 0.1;
         const pips = diff / pipSize;
-        // $/pip/lot: forex thường = $10; JPY = 1000/giá (vì 1 pip = 1000 JPY/lot → đổi ra USD)
-        const usdPerPipPerLot = isJpy ? 1000 / curAsset.price : curAsset.category === 'Forex' ? 10 : 0.1; // crypto: 1 pip = $0.10/lot
-        const pnl = pips * p.lot * usdPerPipPerLot;
         return {
           ...p,
           currentPrice: curAsset.price,
           pips: Number(pips.toFixed(1)),
-          pnl: Number(pnl.toFixed(2))
+          pnl
         };
       })
     );
@@ -423,11 +420,9 @@ export const App: React.FC = () => {
       // Tính P&L TƯƠI tại đây (p.pnl từ setPositions bất đồng bộ → stale, không kịp cắt ở ngưỡng $).
       // KHÔNG mutate p.currentPrice/p.pnl trực tiếp (anti-pattern React) — giá live được
       // truyền tường minh vào handleCloseWithOutcome; hiển thị dùng state do floating updater set.
-      const diffLive = p.type === 'BUY' ? px - p.entryPrice : p.entryPrice - px;
-      const isJpyLive = p.symbol.includes('JPY');
-      const pipSizeLive = isJpyLive ? 0.01 : cur.category === 'Forex' ? 0.0001 : 0.1;
-      const usdPerPipLive = isJpyLive ? 1000 / px : cur.category === 'Forex' ? 10 : 0.1; // crypto: 1 pip = $0.10/lot
-      const pnlLive = (diffLive / pipSizeLive) * p.lot * usdPerPipLive;
+      // Dùng livePnlUsd dùng chung (bug 14/10: công thức inline cũ đánh giá thấp XAUUSD 100 lần
+      // → cắt-lỗ-sớm -$2 không bao giờ kích hoạt, lệnh vàng lỗ thật -$15.66 mới đóng).
+      const pnlLive = livePnlUsd(p.symbol, p.type, p.entryPrice, px, p.lot);
       const hitTp = p.type === 'BUY' ? px >= p.tp : px <= p.tp;
       const hitSl = p.type === 'BUY' ? px <= p.sl : px >= p.sl;
       // ĂN NON / CẮT LỖ SỚM dùng pnlLive — ưu tiên cao nhất
