@@ -68,10 +68,20 @@ const LAYER_META = {
   sync: { label: 'ĐỒNG BỘ', icon: RefreshCw, color: '#34d399' },
 };
 
+const POS_API = (): string => {
+  try {
+    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || '';
+    return u ? u.replace(/\/$/, '') : '';
+  } catch { return ''; }
+};
+
+interface KzStatus { ok: boolean | null; detail: string; }
+
 export default function DataFlowTab() {
   const [statuses, setStatuses] = useState<Record<string, SourceStatus>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [lastCheck, setLastCheck] = useState<string>('');
+  const [kz, setKz] = useState<Record<string, KzStatus>>({});
   const mounted = useRef(true);
 
   const pingOne = useCallback(async (src: SourceDef): Promise<SourceStatus> => {
@@ -100,11 +110,48 @@ export default function DataFlowTab() {
     setRefreshing(false);
   }, [pingOne]);
 
+  const pingKaizen = useCallback(async () => {
+    const base = POS_API();
+    const init: Record<string, KzStatus> = {
+      benchmarks: { ok: null, detail: 'đang ping…' },
+      findings: { ok: null, detail: 'đang ping…' },
+      knowledge: { ok: null, detail: 'đang ping…' },
+    };
+    if (mounted.current) setKz(init);
+    if (!base) {
+      if (mounted.current) setKz({
+        benchmarks: { ok: false, detail: 'chưa cấu hình VITE_POSITIONS_API_URL' },
+        findings: { ok: false, detail: 'chưa cấu hình VITE_POSITIONS_API_URL' },
+        knowledge: { ok: false, detail: 'chưa cấu hình VITE_POSITIONS_API_URL' },
+      });
+      return;
+    }
+    const get = async (path: string, pick: (d: any) => string): Promise<KzStatus> => {
+      try {
+        const r = await fetch(`${base}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+        const d = await r.json().catch(() => null);
+        return r.ok && d?.ok ? { ok: true, detail: pick(d) } : { ok: false, detail: `HTTP ${r.status}` };
+      } catch (e: any) {
+        return { ok: false, detail: e?.message || 'lỗi mạng' };
+      }
+    };
+    const [b, f, k] = await Promise.all([
+      get('/api/benchmarks', (d) => `${d.strategies?.length ?? 0} strategy`),
+      get('/api/kaizen?type=findings', (d) => `${d.findings?.length ?? 0} findings`),
+      get('/api/kaizen?type=knowledge', (d) => {
+        const arr = d.knowledge || [];
+        return `${arr.filter((x: any) => x.active).length}/${arr.length} luật hiệu lực`;
+      }),
+    ]);
+    if (mounted.current) setKz({ benchmarks: b, findings: f, knowledge: k });
+  }, []);
+
   useEffect(() => {
     mounted.current = true;
     pingAll();
+    pingKaizen();
     return () => { mounted.current = false; };
-  }, [pingAll]);
+  }, [pingAll, pingKaizen]);
 
   const okCount = Object.values(statuses).filter((s) => s.ok === true).length;
   const failCount = Object.values(statuses).filter((s) => s.ok === false).length;
@@ -128,7 +175,7 @@ export default function DataFlowTab() {
           {failCount > 0 && <span className="text-xs font-mono text-rose-400">🔴 {failCount} chặn</span>}
           {pendingCount > 0 && <span className="text-xs font-mono text-amber-400">🟡 {pendingCount} đang ping</span>}
           <button
-            onClick={pingAll}
+            onClick={() => { pingAll(); pingKaizen(); }}
             disabled={refreshing}
             className="px-3 py-1.5 rounded-lg bg-cyan-600/20 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 hover:bg-cyan-600/30 disabled:opacity-50"
           >
@@ -140,7 +187,7 @@ export default function DataFlowTab() {
       {/* Sơ đồ dòng chảy */}
       <div className="glass-panel p-4">
         <div className="text-xs font-bold text-slate-300 mb-3">SƠ ĐỒ DÒNG CHẢY</div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {/* Cột 1: Nguồn */}
           <FlowColumn title="1. NGUỒN" icon="📡" color="#38bdf8">
             {(Object.keys(LAYER_META) as (keyof typeof LAYER_META)[]).map((layer) => {
@@ -209,6 +256,30 @@ export default function DataFlowTab() {
             <FlowNode title="FLIGHT / RADAR" desc="Tín hiệu hiển thị" live={okCount > 0} />
             <FlowNode title="AI Proxy" desc="13 provider phân tích" live={true} />
           </FlowColumn>
+
+          {/* Cột 5: Vòng Kaizen khép kín — ping thật API */}
+          <FlowColumn title="5. VÒNG KAIZEN" icon="🔁" color="#f472b6">
+            <FlowNode
+              title="Đối ứng Benchmark"
+              desc={kz.benchmarks?.ok ? `✅ ${kz.benchmarks.detail} · /api/benchmarks` : kz.benchmarks?.detail || 'đang ping…'}
+              live={kz.benchmarks?.ok === true}
+            />
+            <FlowNode
+              title="Kaizen Engine"
+              desc={kz.findings?.ok ? `✅ ${kz.findings.detail} · /api/kaizen` : kz.findings?.detail || 'đang ping…'}
+              live={kz.findings?.ok === true}
+            />
+            <FlowNode
+              title="Kho kiến thức"
+              desc={kz.knowledge?.ok ? `✅ ${kz.knowledge.detail}` : kz.knowledge?.detail || 'đang ping…'}
+              live={kz.knowledge?.ok === true}
+            />
+            <FlowNode title="Neural (shadow)" desc="quan sát · chưa can thiệp tín hiệu" live={true} />
+            <FlowNode title="Cổng RADAR" desc="Phase C — lọc nhiễu bằng knowledge + NN" live={false} />
+          </FlowColumn>
+        </div>
+        <div className="mt-3 text-[10px] text-slate-500">
+          🔁 Vòng Kaizen khép kín: dữ liệu thật (cột 3) → đối ứng → finding → kho kiến thức → <span className="text-pink-300">Phase C: cổng RADAR</span> → tín hiệu sạch, win rate max.
         </div>
         <div className="mt-3 text-[10px] text-slate-500">
           💡 Đường chảy <span className="text-emerald-400">xanh chuyển động</span> = dữ liệu đang realtime ·
