@@ -7,6 +7,7 @@ import { KaizenAnalysis } from '../../types';
 import { fmtLocalTime } from '../../lib/time';
 import { entryPnlUsd, fmtUsd, realizedPnlUsd } from '../../lib/account';
 import { SharedPanel } from '../SharedPanel';
+import { BenchmarkPanel } from '../BenchmarkPanel';
 
 interface LogTabProps {
   journal: JournalEntry[];
@@ -218,6 +219,15 @@ ${rows}
           )}
         </div>
       </div>
+
+      {/* ĐỐI ỨNG BENCHMARK — so sánh với strategy tham chiếu (kaizen) */}
+      <BenchmarkPanel
+        systemStats={fs}
+        systemCurve={equityCurve(fj)}
+        systemUsd={totalUsd}
+        cutoff={cutoff}
+        range={range}
+      />
 
       {/* Đường cong tăng trưởng R (toàn thời gian) */}
       <div className="glass-panel p-5 space-y-3">
