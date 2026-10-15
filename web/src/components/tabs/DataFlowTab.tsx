@@ -126,37 +126,51 @@ export default function DataFlowTab() {
       });
       return;
     }
-    const get = async (path: string, pick: (d: any) => string): Promise<KzStatus> => {
+    // Render free ngủ sau ~15' không gọi → lần fetch đầu có thể timeout trong lúc
+    // server khởi động lại (30-60s). Thử nhanh 15s; timeout thì báo "đang đánh thức"
+    // và thử lại 60s — chỉ đỏ khi cả 2 lần đều thất bại.
+    type Raw = { d: any } | { http: number } | null; // null = timeout/lỗi mạng
+    const raw = async (path: string, ms: number): Promise<Raw> => {
       try {
-        const r = await fetch(`${base}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+        const r = await fetch(`${base}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(ms) });
         const d = await r.json().catch(() => null);
-        return r.ok && d?.ok ? { ok: true, detail: pick(d) } : { ok: false, detail: `HTTP ${r.status}` };
-      } catch (e: any) {
-        return { ok: false, detail: e?.message || 'lỗi mạng' };
+        return r.ok && d?.ok ? { d } : { http: r.status };
+      } catch {
+        return null;
       }
     };
-    const getK = async (): Promise<KzStatus> => {
-      try {
-        const r = await fetch(`${base}/api/kaizen?type=knowledge`, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
-        const d = await r.json().catch(() => null);
-        if (!r.ok || !d?.ok) return { ok: false, detail: `HTTP ${r.status}` };
-        const arr = d.knowledge || [];
-        const blocks = arr.filter((x: any) => x.active && (x.effect || 'research') === 'block').length;
-        return {
-          ok: true,
-          detail: `${arr.filter((x: any) => x.active).length}/${arr.length} luật hiệu lực · ${blocks} chặn`,
-          blocks,
-        };
-      } catch (e: any) {
-        return { ok: false, detail: e?.message || 'lỗi mạng' };
-      }
-    };
-    const [b, f, k] = await Promise.all([
-      get('/api/benchmarks', (d) => `${d.strategies?.length ?? 0} strategy`),
-      get('/api/kaizen?type=findings', (d) => `${d.findings?.length ?? 0} findings`),
-      getK(),
-    ]);
-    if (mounted.current) setKz({ benchmarks: b, findings: f, knowledge: k });
+    const paths = ['/api/benchmarks', '/api/kaizen?type=findings', '/api/kaizen?type=knowledge'];
+    let ds: Raw[] = await Promise.all(paths.map((p) => raw(p, 15000)));
+    if (ds.some((x) => x === null) && mounted.current) {
+      setKz({
+        benchmarks: { ok: null, detail: '⏳ server đang khởi động, thử lại…' },
+        findings: { ok: null, detail: '⏳ server đang khởi động, thử lại…' },
+        knowledge: { ok: null, detail: '⏳ server đang khởi động, thử lại…' },
+      });
+      ds = await Promise.all(paths.map((p, i) => (ds[i] === null ? raw(p, 60000) : Promise.resolve(ds[i]))));
+    }
+    const fmt = (x: Raw, pick: (d: any) => string): KzStatus =>
+      x === null ? { ok: false, detail: 'server không phản hồi (đã thử 2 lần)' }
+      : 'http' in x ? { ok: false, detail: `API lỗi HTTP ${x.http}` }
+      : { ok: true, detail: pick(x.d) };
+    const kd = ds[2];
+    const k: KzStatus =
+      kd === null ? { ok: false, detail: 'server không phản hồi (đã thử 2 lần)' }
+      : typeof kd === 'object' && 'http' in kd ? { ok: false, detail: `API lỗi HTTP ${kd.http}` }
+      : (() => {
+          const arr = (kd as { d: any }).d.knowledge || [];
+          const blocks = arr.filter((x: any) => x.active && (x.effect || 'research') === 'block').length;
+          return {
+            ok: true,
+            detail: `${arr.filter((x: any) => x.active).length}/${arr.length} luật hiệu lực · ${blocks} chặn`,
+            blocks,
+          } as KzStatus;
+        })();
+    if (mounted.current) setKz({
+      benchmarks: fmt(ds[0], (d) => `${d.strategies?.length ?? 0} strategy`),
+      findings: fmt(ds[1], (d) => `${d.findings?.length ?? 0} findings`),
+      knowledge: k,
+    });
   }, []);
 
   useEffect(() => {
