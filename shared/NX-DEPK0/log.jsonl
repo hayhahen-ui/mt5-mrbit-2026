@@ -161,3 +161,4 @@
 {"ts":1792037961140,"type":"trade","symbol":"USDJPY","direction":"SELL","entry":157.673,"exit":157.752,"lot":0.01,"pnl":null,"rMultiple":-1,"outcome":"SL","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1792038458890,"type":"trade","symbol":"XAUUSD","direction":"SELL","entry":4146.5,"exit":4146,"lot":0.01,"pnl":null,"rMultiple":0.08,"outcome":"TIME","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1792042494304,"type":"position_open","symbol":"XAUUSD","direction":"SELL","entry":4142.1,"exit":null,"lot":0.01,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP1 TP:4138.58 SL:4145.62","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
+{"ts":1792042496519,"type":"position_open","symbol":"XAUUSD","direction":"SELL","entry":4142.1,"exit":null,"lot":0.01,"pnl":null,"rMultiple":null,"outcome":"OPEN","note":"TP1 TP:4138.58 SL:4145.62","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
