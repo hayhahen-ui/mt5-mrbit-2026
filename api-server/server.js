@@ -1,7 +1,9 @@
 /**
  * server.js — API nấc 2 chạy trên Render Web Service (free tier).
  *
- * Mount các handler Vercel-style trong ../api/*.js qua adapter Express.
+ * Mount các handler trong ./handlers/*.js qua adapter Express.
+ * (Đã dọn khỏi api/ để Vercel Hobby không vượt 12 serverless functions;
+ *  api/ chỉ giữ các endpoint cũ: fred, twelvedata, shared, ff-calendar...).
  * Các handler chỉ dùng req.query / req.body / req.headers / req.method
  * và res.status().json() / res.setHeader() — tương thích Express nguyên bản.
  *
@@ -9,14 +11,14 @@
  * Các API còn lại (fred, twelvedata, shared, ff-calendar...) vẫn ở Vercel.
  */
 import express from 'express';
-import positions from '../api/positions.js';
-import positionClose from '../api/position-close.js';
-import positionUpdate from '../api/position-update.js';
-import accountState from '../api/account-state.js';
-import agentBrief from '../api/agent-brief.js';
-import benchmarks from '../api/benchmarks.js';
-import benchmarkTrades from '../api/benchmark-trades.js';
-import kaizen from '../api/kaizen.js';
+import positions from './handlers/positions.js';
+import positionClose from './handlers/position-close.js';
+import positionUpdate from './handlers/position-update.js';
+import accountState from './handlers/account-state.js';
+import agentBrief from './handlers/agent-brief.js';
+import benchmarks from './handlers/benchmarks.js';
+import benchmarkTrades from './handlers/benchmark-trades.js';
+import kaizen from './handlers/kaizen.js';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
