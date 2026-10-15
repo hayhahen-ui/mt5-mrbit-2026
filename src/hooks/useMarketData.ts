@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Asset, Signal, NewsEvent, MarketSnapshot, DataSource } from '../types';
 import { INITIAL_ASSETS } from '../data/mockData';
-import { fetchAllQuotes, fetchKrakenHistory } from '../lib/marketData';
+import { fetchAllQuotes, fetchGoldQuote, fetchKrakenHistory } from '../lib/marketData';
 import { Quote } from '../types';
 import { getTdKey, tdCandles, TD_LIST, TD_QUOTE_LIST, tdHasQuota, sleep, TD_GAP_MS, recordTdError, clearTdError } from '../lib/twelvedata';
 import { mergeTdCandles } from '../lib/tdStore';
@@ -82,6 +82,9 @@ async function getMacroScoresAsync(): Promise<Record<string, { score: number | n
 const CRYPTO_POLL_MS = 60000;
 const FOREX_POLL_MS = 600000;
 const NEWS_POLL_MS = 900000;
+// Vàng poll nhanh riêng 20s (fix 15/10): quote 60s khiến cắt-lỗ-sớm trượt mạnh
+// trong thị trường rơi nhanh — bot chỉ cắt được ở quote đầu tiên nhìn thấy.
+// 20s ≈ 4.320 req/ngày, chỉ gọi gold-api, không ảnh hưởng nhịp forex/crypto.
 
 /**
  * Hook dữ liệu thị trường THẬT:
@@ -339,6 +342,14 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       applyQuotes(quotes, news);
     };
     const fastId = window.setInterval(tickFast, CRYPTO_POLL_MS);
+    // Vàng poll nhanh 20s: chỉ gold-api, qua quoteGuard như thường lệ.
+    // Vòng auto-close trong App chạy theo mỗi lần assets đổi → cắt lỗ sát giá hơn.
+    const goldFastId = window.setInterval(async () => {
+      try {
+        const q = await fetchGoldQuote();
+        if (q) applyQuotes({ XAUUSD: q }, []);
+      } catch { /* lỗi mạng thì bỏ qua, 20s sau thử lại */ }
+    }, 20000);
     // Forex trong fetchAllQuotes đã gộp; tách nhịp riêng để đỡ tải:
     forexTimer = window.setInterval(async () => {
       const quotes = tdOverride(await fetchAllQuotes());
@@ -369,6 +380,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
     }, NEWS_POLL_MS);
     return () => {
       window.clearInterval(fastId);
+      window.clearInterval(goldFastId);
       window.clearInterval(forexTimer);
       window.clearInterval(newsId);
       window.clearInterval(tdId);
