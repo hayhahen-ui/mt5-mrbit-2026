@@ -11,6 +11,8 @@ interface AiAskProps {
   buildPrompt: () => string | Promise<string>;
   systemPrompt?: string;
   maxTokens?: number;
+  /** P4-kaizen 16/10/2026: temperature thap cho phan tich (default 0.3) */
+  temperature?: number;
 }
 
 const DEFAULT_SYSTEM =
@@ -35,7 +37,7 @@ function renderText(t: string) {
 }
 
 /** Nút + panel gọi AI phân tích — dùng chung cho FLIGHT/NEWS. */
-export const AiAsk: React.FC<AiAskProps> = ({ buttonLabel, buildPrompt, systemPrompt, maxTokens = 1024 }) => {
+export const AiAsk: React.FC<AiAskProps> = ({ buttonLabel, buildPrompt, systemPrompt, maxTokens = 1024, temperature = 0.3 }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [meta, setMeta] = useState('');
@@ -76,6 +78,7 @@ export const AiAsk: React.FC<AiAskProps> = ({ buttonLabel, buildPrompt, systemPr
           { role: 'user', content: await buildPrompt() },
         ],
         maxTokens,
+        { temperature },
       );
       setResult(r.content);
       setMeta(`${r.provider} · ${r.model}`);

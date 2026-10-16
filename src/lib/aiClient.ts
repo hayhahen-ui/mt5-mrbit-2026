@@ -31,8 +31,12 @@ export async function validateAiKey(providerId: string, apiKey: string): Promise
 
 export interface AiChatResult { content: string; provider: string; model: string }
 
-/** Chat với provider đang active — ném Error khi chưa cấu hình hoặc provider lỗi */
-export async function aiChat(messages: AiChatMessage[], maxTokens = 1024): Promise<AiChatResult> {
+/** Chat với provider đang active — ném Error khi chưa cấu hình hoặc provider lỗi.
+ * P4-kaizen 16/10/2026: temperature mặc định 0.3 (tác vụ phân tích — theo kim chỉ nam
+ * decoding: T thấp -> deterministic, ít bịa). Truyền opts.temperature để chỉnh. */
+export async function aiChat(
+  messages: AiChatMessage[], maxTokens = 1024, opts: { temperature?: number } = {}
+): Promise<AiChatResult> {
   const active = getActiveProvider();
   if (!active) throw new Error('Chưa cấu hình AI. Vào HELP → CÀI ĐẶT AI để nhập API key.');
   const apiKey = getAiKey(active.provider);
@@ -40,6 +44,7 @@ export async function aiChat(messages: AiChatMessage[], maxTokens = 1024): Promi
   const d = await callProxy({
     action: 'chat', providerId: active.provider, apiKey,
     model: active.model, messages, maxTokens,
+    temperature: opts.temperature ?? 0.3,
   });
   if (!d.ok || !d.content) {
     throw new Error(d.error || 'AI không trả về nội dung.');

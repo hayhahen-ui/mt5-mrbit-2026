@@ -69,7 +69,9 @@ function toOpenAiMessages(messages) {
   return messages.map((m) => ({ role: m.role, content: m.content }));
 }
 
-async function chatGemini(meta, apiKey, model, messages, maxTokens) {
+// P4-kaizen 16/10/2026: temperature thap (0-0.3) cho tac vu phan tich — theo kim chi nam
+// decoding (Stanford CS229): T=0.3 -> phan bo nhon 98.4%, gan nhu deterministic.
+async function chatGemini(meta, apiKey, model, messages, maxTokens, temperature) {
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
   const contents = messages
     .filter((m) => m.role !== 'system')
@@ -82,7 +84,7 @@ async function chatGemini(meta, apiKey, model, messages, maxTokens) {
       body: JSON.stringify({
         ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
         contents,
-        generationConfig: { maxOutputTokens: maxTokens },
+        generationConfig: { maxOutputTokens: maxTokens, temperature },
       }),
     },
     CHAT_TIMEOUT_MS,
@@ -95,7 +97,7 @@ async function chatGemini(meta, apiKey, model, messages, maxTokens) {
   return content;
 }
 
-async function chatOpenAiCompatible(meta, apiKey, model, messages, maxTokens) {
+async function chatOpenAiCompatible(meta, apiKey, model, messages, maxTokens, temperature) {
   // Một số provider (VD: model free của APInex lúc quá tải) thỉnh thoảng trả 200
   // nhưng nội dung rỗng — glitch thoáng qua, thử lại vài lần trước khi báo lỗi.
   const maxAttempts = 3;
@@ -103,7 +105,7 @@ async function chatOpenAiCompatible(meta, apiKey, model, messages, maxTokens) {
     const r = await fetchTimeout(`${meta.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: toOpenAiMessages(messages), max_tokens: maxTokens }),
+      body: JSON.stringify({ model, messages: toOpenAiMessages(messages), max_tokens: maxTokens, temperature }),
     }, CHAT_TIMEOUT_MS);
     const text = await r.text();
     if (!r.ok) throw new Error(`HTTP ${r.status}: ${text.slice(0, 300)}`);
@@ -116,14 +118,14 @@ async function chatOpenAiCompatible(meta, apiKey, model, messages, maxTokens) {
   throw new Error('Provider không trả về nội dung (đã thử 3 lần).');
 }
 
-async function chatAnthropic(meta, apiKey, model, messages, maxTokens) {
+async function chatAnthropic(meta, apiKey, model, messages, maxTokens, temperature) {
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
   const rest = messages.filter((m) => m.role !== 'system').map((m) => ({ role: m.role, content: m.content }));
   const r = await fetchTimeout(`${meta.baseUrl}/v1/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model, max_tokens: maxTokens,
+      model, max_tokens: maxTokens, temperature,
       ...(system ? { system } : {}),
       messages: rest,
     }),
@@ -136,10 +138,10 @@ async function chatAnthropic(meta, apiKey, model, messages, maxTokens) {
   return content;
 }
 
-async function chat(meta, apiKey, model, messages, maxTokens) {
-  if (meta.kind === 'gemini') return chatGemini(meta, apiKey, model, messages, maxTokens);
-  if (meta.kind === 'anthropic') return chatAnthropic(meta, apiKey, model, messages, maxTokens);
-  return chatOpenAiCompatible(meta, apiKey, model, messages, maxTokens);
+async function chat(meta, apiKey, model, messages, maxTokens, temperature) {
+  if (meta.kind === 'gemini') return chatGemini(meta, apiKey, model, messages, maxTokens, temperature);
+  if (meta.kind === 'anthropic') return chatAnthropic(meta, apiKey, model, messages, maxTokens, temperature);
+  return chatOpenAiCompatible(meta, apiKey, model, messages, maxTokens, temperature);
 }
 
 // ─── Handler ───────────────────────────────────────────────────────────────
@@ -156,6 +158,8 @@ export default async function handler(req, res) {
     try { body = JSON.parse(body); } catch { body = {}; }
   }
   const { action, providerId, apiKey, model, messages, maxTokens } = body || {};
+  // P4: temperature mac dinh 0.3 (phan tich), clamp 0-2
+  const temperature = Math.min(2, Math.max(0, Number(body?.temperature ?? 0.3) || 0));
 
   // KHÔNG log apiKey ở bất cứ đâu
   if (typeof apiKey !== 'string' || apiKey.trim().length < 8) {
@@ -173,7 +177,7 @@ export default async function handler(req, res) {
       if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
         return res.status(400).json({ ok: false, error: 'messages không hợp lệ (1–50).' });
       }
-      const content = await chat(meta, apiKey.trim(), String(model || '').trim() || 'default', messages, Math.min(Math.max(Number(maxTokens) || 1024, 1), 4096));
+      const content = await chat(meta, apiKey.trim(), String(model || '').trim() || 'default', messages, Math.min(Math.max(Number(maxTokens) || 1024, 1), 4096), temperature);
       return res.status(200).json({ ok: true, content });
     }
     return res.status(400).json({ ok: false, error: 'action phải là validate | chat.' });
