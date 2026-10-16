@@ -181,3 +181,4 @@
 {"ts":1792117032765,"type":"trade","symbol":"BTCUSD","direction":"BUY","entry":82068.4,"exit":82011.12,"lot":0.01,"pnl":null,"rMultiple":-1,"outcome":"SL","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1792117248211,"type":"trade","symbol":"XAUUSD","direction":"BUY","entry":4157.1,"exit":4155.1,"lot":0.01,"pnl":null,"rMultiple":-0.43,"outcome":"SL","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
 {"ts":1792118744519,"type":"trade","symbol":"USDJPY","direction":"SELL","entry":158.026,"exit":157.967,"lot":0.01,"pnl":null,"rMultiple":0.74,"outcome":"TIME","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
+{"ts":1792118746512,"type":"trade","symbol":"USDJPY","direction":"SELL","entry":158.026,"exit":157.967,"lot":0.01,"pnl":null,"rMultiple":0.74,"outcome":"TIME","note":"","deviceId":"dev-5cch4ob0","deviceName":"dev-5cch4ob0"}
