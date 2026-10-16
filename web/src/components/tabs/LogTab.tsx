@@ -5,7 +5,8 @@ import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
 import { analyzeKaizen, analyzeKaizenFull } from '../../lib/kaizen';
 import { KaizenAnalysis } from '../../types';
 import { fmtLocalTime } from '../../lib/time';
-import { entryPnlUsd, fmtUsd, realizedPnlUsdClean } from '../../lib/account';
+import { entryPnlUsd, fmtUsd, realizedPnlUsd, realizedPnlUsdClean } from '../../lib/account';
+import { verifyRows, decidedStats, reconcile, dataQuality, symbolSubtotals, VerifyRow } from '../../lib/reportVerify';
 import { SharedPanel } from '../SharedPanel';
 import { BenchmarkPanel } from '../BenchmarkPanel';
 import { KaizenEnginePanel } from '../KaizenEnginePanel';
@@ -21,6 +22,48 @@ interface LogTabProps {
 
 type RangeKey = '7D' | '30D' | 'ALL';
 
+/** Bảng "lệnh đằng sau con số" — dùng chung cho drill-down mọi thẻ metric */
+const VerifyTable: React.FC<{ list: VerifyRow[]; rest: number }> = ({ list, rest }) => (
+  <div className="overflow-x-auto">
+    <table className="w-full text-[11px]">
+      <thead>
+        <tr className="text-slate-500 text-left">
+          <th className="py-1 pr-2 font-sans">Giờ đóng</th>
+          <th className="pr-2 font-sans">Mã</th>
+          <th className="pr-2 font-sans">Chiều</th>
+          <th className="pr-2 font-sans">Kết quả</th>
+          <th className="pr-2 text-right font-sans">R</th>
+          <th className="pr-2 text-right font-sans">Pips*</th>
+          <th className="text-right font-sans">$</th>
+        </tr>
+      </thead>
+      <tbody>
+        {list.map((r) => (
+          <tr key={r.id} className="border-t border-[#1e2b48]">
+            <td className="py-1 pr-2 text-slate-400 whitespace-nowrap">{fmtLocalTime(r.closeTime)}</td>
+            <td className="pr-2 font-bold text-slate-200">{r.symbol}</td>
+            <td className={`pr-2 ${r.direction === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>{r.direction}</td>
+            <td className="pr-2 whitespace-nowrap">
+              <span className={OUTCOME_META[r.outcome].color}>{OUTCOME_META[r.outcome].label}</span>
+              {r.isOutlierLot && <span className="ml-1 text-amber-400" title="Đã loại khỏi tổng $">⚠lot</span>}
+            </td>
+            <td className={`pr-2 text-right ${r.rMultiple >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {r.rMultiple >= 0 ? '+' : ''}{r.rMultiple}
+            </td>
+            <td className="pr-2 text-right text-slate-300">{r.pips >= 0 ? '+' : ''}{r.pips}</td>
+            <td className={`text-right whitespace-nowrap ${r.pnlUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {r.pnlUsd >= 0 ? '+' : '-'}{fmtUsd(Math.abs(r.pnlUsd))}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {rest > 0 && <div className="text-slate-500 pt-1 font-sans">…còn {rest} lệnh nữa trong tập này</div>}
+    {list.length === 0 && <div className="text-slate-500 font-sans">Không có lệnh nào trong tập này.</div>}
+    <div className="text-[10px] text-slate-600 pt-1 font-sans">*Pips = tính lại từ giá vào/ra (tự chữa bản ghi cũ), không phải cột pips thô đã lưu.</div>
+  </div>
+);
+
 export const LogTab: React.FC<LogTabProps> = ({ journal, positions = [], onClearJournal, onClearKaizen, onResetAll, resetMark }) => {
   const [range, setRange] = useState<RangeKey>('ALL');
   const stats = calcJournalStats(journal);
@@ -33,16 +76,30 @@ export const LogTab: React.FC<LogTabProps> = ({ journal, positions = [], onClear
   // LÃI/LỖ ($) dùng tổng đã loại outlier lot (audit 16/10/2026: 1 lệnh lot 7.58 đảo dấu tổng $)
   const pnlClean = realizedPnlUsdClean(fj);
   const totalUsd = pnlClean.total;
+  const rawUsd = realizedPnlUsd(fj);
+
+  // REPORT kiểm chứng được (audit 16/10/2026): mở rộng từng thẻ để thấy công thức + lệnh đằng sau
+  const [openCard, setOpenCard] = useState<null | 'signals' | 'win' | 'pips' | 'avgR' | 'usd'>(null);
+  const [symFilter, setSymFilter] = useState<string | null>(null);
+  const rows = React.useMemo(() => verifyRows(fj), [fj]);
+  const recon = React.useMemo(() => reconcile(fj), [fj]);
+  const dq = React.useMemo(() => dataQuality(fj), [fj]);
+  const subs = React.useMemo(() => symbolSubtotals(fj), [fj]);
+  const toggleCard = (k: NonNullable<typeof openCard>) => setOpenCard(openCard === k ? null : k);
+  const toggleSymFilter = (s: string) => {
+    setSymFilter(symFilter === s ? null : s);
+    if (symFilter !== s) setOpenCard('signals'); // bấm mã → mở ngay danh sách lệnh đã lọc
+  };
 
   const byQ = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'].map((q) => {
     const es = fj.filter((j) => j.quality === q);
-    const wins = es.filter((j) => j.outcome === 'TP').length;
-    const losses = es.filter((j) => j.outcome === 'SL').length;
-    const decided = wins + losses;
+    const d = decidedStats(es);
     return {
       q,
       n: es.length,
-      win: decided ? Number(((wins / decided) * 100).toFixed(0)) : 0,
+      wins: d.wins,
+      decided: d.decided,
+      win: d.winPct,
       r: Number(es.reduce((a, e) => a + e.rMultiple, 0).toFixed(2)),
     };
   });
@@ -51,13 +108,13 @@ export const LogTab: React.FC<LogTabProps> = ({ journal, positions = [], onClear
   const bySym = [...new Set(fj.map((j) => j.symbol))]
     .map((s) => {
       const es = fj.filter((j) => j.symbol === s);
-      const wins = es.filter((j) => j.outcome === 'TP').length;
-      const losses = es.filter((j) => j.outcome === 'SL').length;
-      const decided = wins + losses;
+      const d = decidedStats(es);
       return {
         s,
         n: es.length,
-        win: decided ? Number(((wins / decided) * 100).toFixed(0)) : 0,
+        wins: d.wins,
+        decided: d.decided,
+        win: d.winPct,
         r: Number(es.reduce((a, e) => a + e.rMultiple, 0).toFixed(2)),
       };
     })
@@ -142,12 +199,18 @@ ${rows}
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 font-mono">
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
-            <div className="text-[11px] text-slate-400">SIGNALS</div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">SIGNALS</span>
+              <button onClick={() => toggleCard('signals')} title="Xem công thức + từng lệnh đằng sau con số" className="text-[10px] text-sky-500/70 hover:text-sky-300 font-sans">🔍</button>
+            </div>
             <div className="text-2xl font-bold text-slate-100">{fs.total}</div>
             <div className="text-[10px] text-slate-500 font-sans">lệnh đã đóng sổ</div>
           </div>
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
-            <div className="text-[11px] text-slate-400">WIN</div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">WIN</span>
+              <button onClick={() => toggleCard('win')} title="Xem công thức + từng lệnh đằng sau con số" className="text-[10px] text-sky-500/70 hover:text-sky-300 font-sans">🔍</button>
+            </div>
             <div className="text-2xl font-bold text-rose-400">{fs.winRate}%</div>
             <div className="text-[10px] text-slate-500 font-sans">{fs.wins} thắng / {fs.losses} thua · WR trên {fs.wins + fs.losses} lệnh TP/SL</div>
             {(fs.timeStops + fs.manualCloses) > 0 && (
@@ -155,27 +218,146 @@ ${rows}
             )}
           </div>
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
-            <div className="text-[11px] text-slate-400">PIPS</div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">PIPS</span>
+              <button onClick={() => toggleCard('pips')} title="Xem công thức + từng lệnh đằng sau con số" className="text-[10px] text-sky-500/70 hover:text-sky-300 font-sans">🔍</button>
+            </div>
             <div className={`text-2xl font-bold ${fs.totalPips >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {fs.totalPips >= 0 ? '+' : ''}{fs.totalPips}
             </div>
             <div className="text-[10px] text-slate-500 font-sans">tổng pips tích lũy</div>
           </div>
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
-            <div className="text-[11px] text-slate-400">AVG R</div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">AVG R</span>
+              <button onClick={() => toggleCard('avgR')} title="Xem công thức + từng lệnh đằng sau con số" className="text-[10px] text-sky-500/70 hover:text-sky-300 font-sans">🔍</button>
+            </div>
             <div className={`text-2xl font-bold ${fs.avgR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {fs.avgR >= 0 ? '+' : ''}{fs.avgR}
             </div>
             <div className="text-[10px] text-slate-500 font-sans">Tổng {fs.totalR >= 0 ? '+' : ''}{fs.totalR}R · PF {fs.profitFactor}</div>
           </div>
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-emerald-800/60 space-y-1">
-            <div className="text-[11px] text-slate-400">LÃI/LỖ ($)</div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">LÃI/LỖ ($)</span>
+              <button onClick={() => toggleCard('usd')} title="Xem công thức + từng lệnh đằng sau con số" className="text-[10px] text-sky-500/70 hover:text-sky-300 font-sans">🔍</button>
+            </div>
             <div className={`text-2xl font-bold ${totalUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {totalUsd >= 0 ? '+' : '-'}{fmtUsd(Math.abs(totalUsd))}
             </div>
             <div className="text-[10px] text-slate-500 font-sans">
               tổng tiền đã thực hiện ({range}){pnlClean.excludedCount > 0 ? ` · đã loại ${pnlClean.excludedCount} outlier lot` : ''}
             </div>
+          </div>
+        </div>
+
+        {/* DRILL-DOWN kiểm chứng — công thức + từng lệnh đằng sau con số */}
+        {openCard && (
+          <div className="bg-[#0b0f19] rounded-xl border border-sky-800/50 p-4 space-y-3 font-mono">
+            {(() => {
+              const decided = fs.wins + fs.losses;
+              const base = openCard === 'win'
+                ? rows.filter((r) => r.outcome === 'TP' || r.outcome === 'SL')
+                : rows;
+              const filtered = symFilter ? base.filter((r) => r.symbol === symFilter) : base;
+              const list = filtered.slice(0, 20);
+              const rest = Math.max(0, filtered.length - 20);
+              const sub = (label: string, val: string) => (
+                <div className="text-[11px]">
+                  <span className="text-slate-500 font-sans">{label}: </span>
+                  <span className="text-slate-200">{val}</span>
+                </div>
+              );
+              const perSym = (fmt: (s: (typeof subs)[number]) => string) => subs.map((s) => fmt(s)).join(' · ');
+              const titles: Record<string, string> = {
+                signals: 'SIGNALS — LỆNH ĐÃ ĐÓNG SỔ',
+                win: 'WIN — TỶ LỆ THẮNG',
+                pips: 'PIPS — TỔNG PIPS TÍCH LŨY',
+                avgR: 'AVG R — R TRUNG BÌNH',
+                usd: 'LÃI/LỖ ($) — TIỀN ĐÃ THỰC HIỆN',
+              };
+              return (
+                <>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="text-[12px] font-bold text-sky-300">🔍 KIỂM CHỨNG — {titles[openCard]}</div>
+                    <div className="flex items-center gap-2">
+                      {symFilter && (
+                        <button
+                          onClick={() => setSymFilter(null)}
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-500/50 text-sky-300 font-sans"
+                        >
+                          Lọc mã: {symFilter} ✕
+                        </button>
+                      )}
+                      <button onClick={() => setOpenCard(null)} className="text-[10px] text-slate-500 hover:text-slate-300 font-sans">
+                        đóng ✕
+                      </button>
+                    </div>
+                  </div>
+                  {openCard === 'signals' && (
+                    <>
+                      {sub('Công thức', `SIGNALS = đếm lệnh đã đóng sổ trong ${range} = ${fj.length}`)}
+                      {sub('Đầu vào', `TP ${fs.wins} · SL ${fs.losses} · BE ${fs.breakEvens} · TIME ${fs.timeStops} · MANUAL ${fs.manualCloses}`)}
+                    </>
+                  )}
+                  {openCard === 'win' && (
+                    <>
+                      {sub('Công thức', `WR = ${fs.wins} TP ÷ ${decided} lệnh TP+SL = ${fs.winRate}%`)}
+                      {sub('Loại trừ', `BE ${fs.breakEvens} (hòa vốn) · TIME ${fs.timeStops} + MANUAL ${fs.manualCloses} (thoát chủ động, không phản ánh chất lượng tín hiệu)`)}
+                      <div className="text-[10px] text-slate-500 font-sans">Bảng dưới chỉ hiện {decided} lệnh TP/SL — đúng tập dùng tính WR.</div>
+                    </>
+                  )}
+                  {openCard === 'pips' && (
+                    <>
+                      {sub('Công thức', `PIPS = Σ pipsOf(lệnh) = ${fs.totalPips >= 0 ? '+' : ''}${fs.totalPips}`)}
+                      {sub('Tự chữa', `${dq.pipsHealed} bản ghi cũ có pips lưu sai (bug hardcode pipSize) — đã tính lại từ giá vào/ra`)}
+                      {sub('Theo mã', perSym((s) => `${s.symbol}: ${s.totalPips >= 0 ? '+' : ''}${s.totalPips} (${s.n} lệnh)`))}
+                    </>
+                  )}
+                  {openCard === 'avgR' && (
+                    <>
+                      {sub('Công thức', `AVG R = ${fs.totalR}R ÷ ${fs.total} lệnh = ${fs.avgR} · PF ${fs.profitFactor}`)}
+                      {sub('Theo mã', perSym((s) => `${s.symbol}: ${s.totalR >= 0 ? '+' : ''}${s.totalR}R (${s.n} lệnh)`))}
+                    </>
+                  )}
+                  {openCard === 'usd' && (
+                    <>
+                      {sub('Công thức', `$ = Σ entryPnlUsd = ${fmtUsd(rawUsd)} (thô) − ${fmtUsd(pnlClean.excludedUsd)} (${pnlClean.excludedCount} outlier lot) = ${fmtUsd(totalUsd)}`)}
+                      {sub('Theo mã', perSym((s) => `${s.symbol}: ${s.totalUsd >= 0 ? '+' : ''}${fmtUsd(s.totalUsd)} (${s.n} lệnh)`))}
+                      <div className="text-[10px] text-slate-500 font-sans">Outlier = lot gấp 10 lần trung vị — đã loại khỏi tổng, đánh dấu ⚠lot dưới bảng.</div>
+                    </>
+                  )}
+                  <VerifyTable list={list} rest={rest} />
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ĐỐI CHIẾU — tổng theo mã cộng lại vs số trên thẻ */}
+        <div className="bg-[#0b0f19] rounded-xl border border-[#1e2b48] p-3 font-mono">
+          <div className="text-[11px] font-bold text-teal-300 mb-2">
+            🔎 ĐỐI CHIẾU — tổng theo mã cộng lại{' '}
+            {recon.every((r) => r.ok) ? (
+              <span className="text-emerald-400">✓ KHỚP</span>
+            ) : (
+              <span className="text-rose-400">✗ LỆCH — báo ngay cho em</span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+            {recon.map((r) => (
+              <div key={r.key} className={`p-2 rounded-lg border ${r.ok ? 'border-emerald-800/50' : 'border-rose-700'}`}>
+                <div className="text-slate-400 font-sans">
+                  {r.ok ? '✓' : '✗'} {r.label}
+                </div>
+                <div className={r.ok ? 'text-slate-200' : 'text-rose-400 font-bold'}>
+                  {r.bySymbol} = {r.total}
+                  {!r.ok && (
+                    <span> (lệch {r.diff > 0 ? '+' : ''}{r.diff})</span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -192,7 +374,7 @@ ${rows}
                     style={{ width: `${(b.n / maxQ) * 100}%` }}
                   />
                 </div>
-                <div className="text-[10px] font-mono text-slate-400">{b.n} lệnh · {b.win}%</div>
+                <div className="text-[10px] font-mono text-slate-400">{b.n} lệnh · {b.win}% ({b.wins}/{b.decided})</div>
                 <div className={`text-[11px] font-mono font-bold ${b.r >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {b.r >= 0 ? '+' : ''}{b.r}R
                 </div>
@@ -201,9 +383,9 @@ ${rows}
           </div>
         </div>
 
-        {/* RADAR — hiệu suất theo mã */}
+        {/* RADAR — hiệu suất theo mã (bấm vào một mã để lọc danh sách lệnh) */}
         <div className="space-y-2">
-          <div className="text-[11px] font-bold text-amber-400 font-mono">RADAR — THEO MÃ ({range})</div>
+          <div className="text-[11px] font-bold text-amber-400 font-mono">RADAR — THEO MÃ ({range}) <span className="text-slate-500 font-sans font-normal">· bấm vào mã để lọc lệnh</span></div>
           {bySym.length === 0 ? (
             <div className="text-xs text-slate-500 bg-[#0b0f19] p-3 rounded-lg border border-[#1e2b48] text-center">
               Chưa có lệnh trong khoảng này.
@@ -211,16 +393,21 @@ ${rows}
           ) : (
             <div className="space-y-1.5">
               {bySym.map((b) => (
-                <div key={b.s} className="flex items-center gap-3 text-xs font-mono">
-                  <span className="w-20 font-bold text-slate-200">{b.s}</span>
+                <div
+                  key={b.s}
+                  onClick={() => toggleSymFilter(b.s)}
+                  title="Bấm để lọc danh sách lệnh theo mã này (bấm lại để tắt)"
+                  className={`flex items-center gap-3 text-xs font-mono cursor-pointer rounded-lg px-2 py-1 transition-colors ${symFilter === b.s ? 'bg-sky-500/10 border border-sky-500/50' : 'border border-transparent hover:bg-[#0b0f19]'}`}
+                >
+                  <span className="w-20 font-bold text-slate-200">{b.s}{symFilter === b.s ? ' ✕' : ''}</span>
                   <div className="flex-1 h-2 bg-[#17223b] rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${b.win >= 50 ? 'bg-emerald-400' : b.win >= 30 ? 'bg-amber-400' : 'bg-rose-500'}`}
                       style={{ width: `${b.win}%` }}
                     />
                   </div>
-                  <span className="w-28 text-right text-slate-400 text-[11px]">
-                    {b.n} · {b.win}%
+                  <span className="w-48 text-right text-slate-400 text-[11px]">
+                    {b.n} lệnh · {b.win}% ({b.wins}/{b.decided})
                   </span>
                   <span className={`w-20 text-right font-bold ${b.r >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {b.r >= 0 ? '+' : ''}{b.r}R
@@ -229,6 +416,28 @@ ${rows}
               ))}
             </div>
           )}
+        </div>
+
+        {/* CHẤT LƯỢNG DỮ LIỆU — đếm vấn đề bản ghi, không sửa gì */}
+        <div className="bg-[#0b0f19] rounded-xl border border-[#1e2b48] p-3 font-mono">
+          <div className="text-[11px] font-bold text-amber-300 mb-2">🧪 CHẤT LƯỢNG DỮ LIỆU ({range} — {dq.total} lệnh)</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
+            <div className={`p-2 rounded-lg border ${dq.missingPrices === 0 ? 'border-emerald-800/50' : 'border-amber-600'}`}>
+              <div className="text-slate-400 font-sans">{dq.missingPrices === 0 ? '✓' : '⚠'} Thiếu giá vào/ra</div>
+              <div className="text-slate-200">{dq.missingPrices} bản ghi</div>
+            </div>
+            <div className={`p-2 rounded-lg border ${dq.pipsHealed === 0 ? 'border-emerald-800/50' : 'border-amber-600'}`}>
+              <div className="text-slate-400 font-sans">{dq.pipsHealed === 0 ? '✓' : '⚠'} Pips tự chữa</div>
+              <div className="text-slate-200">{dq.pipsHealed} bản ghi · Σ|chênh| {dq.pipsHealedAbs}</div>
+            </div>
+            <div className={`p-2 rounded-lg border ${dq.outlierCount === 0 ? 'border-emerald-800/50' : 'border-amber-600'}`}>
+              <div className="text-slate-400 font-sans">{dq.outlierCount === 0 ? '✓' : '⚠'} Outlier lot (đã loại khỏi $)</div>
+              <div className="text-slate-200">{dq.outlierCount} lệnh</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500 mt-2 font-sans">
+            "Pips tự chữa" = pips đã lưu ≠ pips tính lại từ giá vào/ra (bug cũ hardcode pipSize 0.0001) — REPORT đã tự dùng giá trị đúng trong mọi tổng, dữ liệu gốc không bị sửa.
+          </div>
         </div>
       </div>
 
