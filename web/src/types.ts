@@ -157,11 +157,17 @@ export interface Signal {
   tp1: number;
   tp2: number;
   tp3: number;
-  tp1Odds: number;
-  tp2Odds: number;
-  tp3Odds: number;
+  /** @deprecated P0-kaizen 16/10/2026: KHONG phai xac suat hieu chinh — truoc day bi tinh bang
+   *  score*0.95 (bia). De optional de tuong thich du lieu cu. Se thay bang calibration that o P2. */
+  tp1Odds?: number;
+  /** @deprecated nhu tren */
+  tp2Odds?: number;
+  /** @deprecated nhu tren */
+  tp3Odds?: number;
   quality: QualityGrade;
-  pWin: number;
+  /** @deprecated P0-kaizen 16/10/2026: KHONG phai xac suat thang that — truoc day = score*0.92 (bia).
+   *  UI khong duoc hien thi nhu xac suat. Se hieu chinh tu du lieu that o P2. */
+  pWin?: number;
   pipsSL: number;
   pipsTP1: number;
   pipsTP2: number;

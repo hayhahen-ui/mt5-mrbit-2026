@@ -266,11 +266,10 @@ export function evaluateSignal(
     tp1: r(tp1),
     tp2: r(tp2),
     tp3: r(tp3),
-    tp1Odds: Math.min(92, Math.round(score * 0.95)),
-    tp2Odds: Math.min(75, Math.round(score * 0.68)),
-    tp3Odds: Math.min(55, Math.round(score * 0.42)),
+    // P0-kaizen 16/10/2026: KHONG tinh tpOdds/pWin gia tu score nua.
+    // Day khong phai xac suat hieu chinh (truoc day: tp1Odds=score*0.95, pWin=score*0.92).
+    // Se bo sung calibration that tu du lieu journal o P2. Tam thoi UI chi hien DIEM SO.
     quality: quality as any,
-    pWin: Math.min(95, Math.round(score * 0.92 * 10) / 10),
     pipsSL: slPips,
     pipsTP1: toPips(tp1 - entry),
     pipsTP2: toPips(tp2 - entry),

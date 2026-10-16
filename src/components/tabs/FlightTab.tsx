@@ -239,10 +239,10 @@ export const FlightTab: React.FC<FlightTabProps> = ({
                 ⭐⭐⭐⭐⭐ {signal.quality}
               </span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="text-slate-400">Xác suất thắng:</span>
-              <span className="font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-                P(win): {signal.pWin}%
+            <div className="flex items-center gap-1" title="Điểm chấm từ các yếu tố kỹ thuật — KHÔNG phải xác suất thắng (P0-kaizen 16/10/2026)">
+              <span className="text-slate-400">Điểm tín hiệu:</span>
+              <span className="font-mono font-bold text-sky-400 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800">
+                {score}/{scoreMax}
               </span>
             </div>
           </div>
