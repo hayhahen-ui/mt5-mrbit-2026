@@ -5,7 +5,7 @@ import { calcJournalStats, equityCurve, OUTCOME_META } from '../../lib/journal';
 import { analyzeKaizen, analyzeKaizenFull } from '../../lib/kaizen';
 import { KaizenAnalysis } from '../../types';
 import { fmtLocalTime } from '../../lib/time';
-import { entryPnlUsd, fmtUsd, realizedPnlUsd } from '../../lib/account';
+import { entryPnlUsd, fmtUsd, realizedPnlUsdClean } from '../../lib/account';
 import { SharedPanel } from '../SharedPanel';
 import { BenchmarkPanel } from '../BenchmarkPanel';
 import { KaizenEnginePanel } from '../KaizenEnginePanel';
@@ -30,15 +30,19 @@ export const LogTab: React.FC<LogTabProps> = ({ journal, positions = [], onClear
   const cutoff = range === 'ALL' ? 0 : Date.now() - (range === '7D' ? 7 : 30) * 86400000;
   const fj = journal.filter((j) => new Date(j.closeTime).getTime() >= cutoff);
   const fs = calcJournalStats(fj);
-  const totalUsd = realizedPnlUsd(fj);
+  // LÃI/LỖ ($) dùng tổng đã loại outlier lot (audit 16/10/2026: 1 lệnh lot 7.58 đảo dấu tổng $)
+  const pnlClean = realizedPnlUsdClean(fj);
+  const totalUsd = pnlClean.total;
 
   const byQ = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'].map((q) => {
     const es = fj.filter((j) => j.quality === q);
     const wins = es.filter((j) => j.outcome === 'TP').length;
+    const losses = es.filter((j) => j.outcome === 'SL').length;
+    const decided = wins + losses;
     return {
       q,
       n: es.length,
-      win: es.length ? Number(((wins / es.length) * 100).toFixed(0)) : 0,
+      win: decided ? Number(((wins / decided) * 100).toFixed(0)) : 0,
       r: Number(es.reduce((a, e) => a + e.rMultiple, 0).toFixed(2)),
     };
   });
@@ -48,10 +52,12 @@ export const LogTab: React.FC<LogTabProps> = ({ journal, positions = [], onClear
     .map((s) => {
       const es = fj.filter((j) => j.symbol === s);
       const wins = es.filter((j) => j.outcome === 'TP').length;
+      const losses = es.filter((j) => j.outcome === 'SL').length;
+      const decided = wins + losses;
       return {
         s,
         n: es.length,
-        win: es.length ? Number(((wins / es.length) * 100).toFixed(0)) : 0,
+        win: decided ? Number(((wins / decided) * 100).toFixed(0)) : 0,
         r: Number(es.reduce((a, e) => a + e.rMultiple, 0).toFixed(2)),
       };
     })
@@ -143,7 +149,10 @@ ${rows}
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
             <div className="text-[11px] text-slate-400">WIN</div>
             <div className="text-2xl font-bold text-rose-400">{fs.winRate}%</div>
-            <div className="text-[10px] text-slate-500 font-sans">{fs.wins} thắng / {fs.losses} thua / {fs.breakEvens} BE</div>
+            <div className="text-[10px] text-slate-500 font-sans">{fs.wins} thắng / {fs.losses} thua · WR trên {fs.wins + fs.losses} lệnh TP/SL</div>
+            {(fs.timeStops + fs.manualCloses) > 0 && (
+              <div className="text-[10px] text-slate-600 font-sans">{fs.timeStops + fs.manualCloses} lệnh TIME/tay không tính WR</div>
+            )}
           </div>
           <div className="bg-[#0b0f19] p-4 rounded-xl border border-[#1e2b48] space-y-1">
             <div className="text-[11px] text-slate-400">PIPS</div>
@@ -164,7 +173,9 @@ ${rows}
             <div className={`text-2xl font-bold ${totalUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {totalUsd >= 0 ? '+' : '-'}{fmtUsd(Math.abs(totalUsd))}
             </div>
-            <div className="text-[10px] text-slate-500 font-sans">tổng tiền thật đã thực hiện ({range})</div>
+            <div className="text-[10px] text-slate-500 font-sans">
+              tổng tiền đã thực hiện ({range}){pnlClean.excludedCount > 0 ? ` · đã loại ${pnlClean.excludedCount} outlier lot` : ''}
+            </div>
           </div>
         </div>
 

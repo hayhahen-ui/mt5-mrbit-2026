@@ -93,20 +93,39 @@ export function entryFromPosition(
   };
 }
 
+/**
+ * Tính lại pips của một bản ghi từ giá vào/ra với pipSizeOf đúng.
+ * Tự chữa các bản ghi cũ: trước đây hardcode 0.0001 cho mọi mã không phải JPY
+ * → cột pips đã lưu của XAU/BTC/ETH/US30 sai hàng nghìn lần (audit 16/10/2026:
+ * tổng PIPS hiển thị -16.5 triệu). Bản ghi mới đã đúng từ entryFromPosition.
+ */
+export function pipsOf(e: JournalEntry): number {
+  if (e.entryPrice > 0 && e.exitPrice > 0) {
+    const diff = e.direction === 'BUY' ? e.exitPrice - e.entryPrice : e.entryPrice - e.exitPrice;
+    return Number((diff / pipSizeOf(e.symbol)).toFixed(1));
+  }
+  return e.pips ?? 0; // thiếu giá: giữ giá trị đã lưu
+}
+
 /** Thống kê tổng hợp từ sổ — thay thế số liệu cứng ở tab LOG */
 export function calcJournalStats(entries: JournalEntry[]): JournalStats {
   const total = entries.length;
   const wins = entries.filter((e) => e.outcome === 'TP').length;
   const losses = entries.filter((e) => e.outcome === 'SL').length;
   const breakEvens = entries.filter((e) => e.outcome === 'BE').length;
-  const winRate = total > 0 ? Number(((wins / total) * 100).toFixed(1)) : 0;
+  const timeStops = entries.filter((e) => e.outcome === 'TIME').length;
+  const manualCloses = entries.filter((e) => e.outcome === 'MANUAL').length;
+  // Win rate chỉ tính trên lệnh đã phân định thắng/thua (TP/SL).
+  // Trước đây chia cho tổng gồm cả TIME/MANUAL → 19.5% gây hiểu lầm (audit 16/10/2026).
+  const decided = wins + losses;
+  const winRate = decided > 0 ? Number(((wins / decided) * 100).toFixed(1)) : 0;
   const totalR = Number(entries.reduce((a, e) => a + e.rMultiple, 0).toFixed(2));
   const avgR = total > 0 ? Number((totalR / total).toFixed(2)) : 0;
   const grossWin = entries.filter((e) => e.rMultiple > 0).reduce((a, e) => a + e.rMultiple, 0);
   const grossLoss = Math.abs(entries.filter((e) => e.rMultiple < 0).reduce((a, e) => a + e.rMultiple, 0));
   const profitFactor = grossLoss > 0 ? Number((grossWin / grossLoss).toFixed(2)) : grossWin > 0 ? 99.99 : 0;
-  const totalPips = Number(entries.reduce((a, e) => a + e.pips, 0).toFixed(1));
-  return { total, wins, losses, breakEvens, winRate, totalR, avgR, profitFactor, totalPips };
+  const totalPips = Number(entries.reduce((a, e) => a + pipsOf(e), 0).toFixed(1));
+  return { total, wins, losses, breakEvens, timeStops, manualCloses, winRate, totalR, avgR, profitFactor, totalPips };
 }
 
 /** Đường cong equity (R tích lũy) cho biểu đồ */

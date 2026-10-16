@@ -138,11 +138,13 @@ export interface JournalStats {
   wins: number;
   losses: number;
   breakEvens: number;
-  winRate: number;      // %
+  timeStops: number;    // lệnh đóng do time-stop
+  manualCloses: number; // lệnh đóng tay
+  winRate: number;      // % = TP/(TP+SL), chỉ tính trên lệnh đã phân định
   totalR: number;
   avgR: number;
   profitFactor: number; // tổng R thắng / |tổng R thua|
-  totalPips: number;
+  totalPips: number;     // tính lại từ giá vào/ra (tự chữa bản ghi cũ)
 }
 
 export interface Signal {

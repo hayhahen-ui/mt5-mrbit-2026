@@ -59,6 +59,46 @@ export function realizedPnlUsd(entries: JournalEntry[]): number {
   return Number(entries.reduce((a, e) => a + entryPnlUsd(e), 0).toFixed(2));
 }
 
+/**
+ * Ngưỡng gắn cờ outlier lot: gấp 10 lần lot trung vị.
+ * Audit 16/10/2026: 1 lệnh GBPUSD lot 7.58 (trung vị ~0.02) đóng góp +$500.28,
+ * một mình đảo dấu tổng $ của REPORT trong khi R không hề bị ảnh hưởng.
+ */
+export const LOT_OUTLIER_MULT = 10;
+
+function medianLot(entries: JournalEntry[]): number {
+  const lots = entries.map((e) => e.lot).filter((l) => l > 0).sort((a, b) => a - b);
+  if (!lots.length) return 0;
+  const m = Math.floor(lots.length / 2);
+  return lots.length % 2 ? lots[m] : (lots[m - 1] + lots[m]) / 2;
+}
+
+/** Các bản ghi có lot bất thường (gấp >10 lần trung vị) — làm méo tổng $ */
+export function lotOutliers(entries: JournalEntry[]): JournalEntry[] {
+  const med = medianLot(entries);
+  if (med <= 0) return [];
+  return entries.filter((e) => e.lot > LOT_OUTLIER_MULT * med);
+}
+
+/**
+ * Tổng P&L đã thực hiện, LOẠI outlier lot — phục vụ REPORT cho khỏi méo số.
+ * realizedPnlUsd giữ nguyên (tổng thô, vẫn dùng cho Balance); hàm này chỉ dùng ở REPORT.
+ */
+export function realizedPnlUsdClean(entries: JournalEntry[]): {
+  total: number;
+  excludedCount: number;
+  excludedUsd: number;
+} {
+  const outIds = new Set(lotOutliers(entries).map((e) => e.id));
+  const kept = entries.filter((e) => !outIds.has(e.id));
+  const dropped = entries.filter((e) => outIds.has(e.id));
+  return {
+    total: Number(kept.reduce((a, e) => a + entryPnlUsd(e), 0).toFixed(2)),
+    excludedCount: dropped.length,
+    excludedUsd: Number(dropped.reduce((a, e) => a + entryPnlUsd(e), 0).toFixed(2)),
+  };
+}
+
 export function loadStartBalance(): number {
   try {
     const raw = localStorage.getItem(KEY);
