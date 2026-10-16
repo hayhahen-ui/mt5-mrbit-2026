@@ -1,7 +1,7 @@
 import {
   Asset, Signal, NewsEvent, DataSource, MarketSnapshot, KaizenRecord,
 } from '../types';
-import { getVerdict, checkNewsFilter, totalScore } from './scoring';
+import { getVerdict, checkNewsFilter, totalScore, maxScore } from './scoring';
 import { appendKaizen } from './kaizen';
 import { ENGINE_NAMES, EngineId } from './engines';
 import { newsNearSymbol } from './news';
@@ -68,11 +68,12 @@ export function currentSession(): string {
 }
 
 function sessionPoints(session: string): { points: number; detail: string } {
+  // P1-kaizen 16/10/2026: finding "Phien giao dich khong phan biet thang/thua" (WR 21-31%) -> giam 50%
   if (session.includes('London') || session.includes('New York'))
-    return { points: 9, detail: `Phiên ${session} — thanh khoản cao` };
+    return { points: 5, detail: `Phiên ${session} — thanh khoản cao` };
   if (session.includes('Tokyo') || session.includes('Sydney'))
-    return { points: 6, detail: `Phiên ${session} — thanh khoản trung bình` };
-  return { points: 4, detail: 'Ngoài giờ phiên chính — thanh khoản thấp' };
+    return { points: 3, detail: `Phiên ${session} — thanh khoản trung bình` };
+  return { points: 2, detail: 'Ngoài giờ phiên chính — thanh khoản thấp' };
 }
 
 /* ---------- quản lý lịch sử ---------- */
@@ -166,22 +167,22 @@ export function evaluateSignal(
   const fTrend = Math.min(20, Math.max(0, 10 + Math.abs(rocV) * 12));
   const fMom = Math.min(20, Math.max(0, 10 + Math.abs(rocV) * 10));
   const healthyVol = atrP > 0.02 && atrP < 3.0;
-  const fVol = healthyVol ? 13 : 5;
+  const fVol = healthyVol ? 7 : 3; // P1-kaizen: 13/5 -> 7/3 (finding: bien_dong khong phan biet thang/thua)
   const sess = sessionPoints(session);
   const rsiOk = rsiV >= 30 && rsiV <= 70;
-  const fRsi = rsiOk ? 13 : 6;
-  const fSpread = spreadOk ? 8 : 4;
-  const fNews = newsFilter.blocked ? 0 : 9;
+  const fRsi = rsiOk ? 7 : 3; // P1-kaizen: 13/6 -> 7/3 (finding: rsi khong phan biet thang/thua)
+  const fSpread = spreadOk ? 4 : 2; // P1-kaizen: 8/4 -> 4/2 (finding: spread khong phan biet thang/thua)
+  const fNews = newsFilter.blocked ? 0 : 5; // P1-kaizen: 0/9 -> 0/5 (finding: tin_tuc khong phan biet thang/thua)
   const prelimDirection = price > ema20 && rocV > 0 ? 'BUY' : price < ema20 && rocV < 0 ? 'SELL' : 'FLAT';
 
   const factors = [
     { id: 'xu_huong', label: 'Xu hướng EMA20', points: Math.round(fTrend), maxPoints: 20, passed: fTrend >= 12, detail: `Giá ${price} vs EMA20 ${ema20.toFixed(asset.digits)} — ${prelimDirection}` },
     { id: 'dong_luong', label: 'Động lượng ROC(10)', points: Math.round(fMom), maxPoints: 20, passed: fMom >= 12, detail: `ROC ${rocV.toFixed(2)}% trên 10 mẫu` },
-    { id: 'bien_dong', label: 'Biến động hợp lý', points: fVol, maxPoints: 15, passed: healthyVol, detail: `Độ lệch chuẩn ${atrP.toFixed(3)}% ${healthyVol ? 'trong vùng an toàn' : 'bất thường'}` },
-    { id: 'phien', label: 'Phiên giao dịch', points: sess.points, maxPoints: 10, passed: sess.points >= 6, detail: sess.detail },
-    { id: 'rsi', label: 'RSI không cực đoan', points: fRsi, maxPoints: 15, passed: rsiOk, detail: `RSI14 = ${rsiV.toFixed(1)}` },
-    { id: 'spread', label: 'Spread trong ngưỡng', points: fSpread, maxPoints: 10, passed: spreadOk, detail: `Spread ${asset.spread} pips` },
-    { id: 'tin_tuc', label: 'Lọc tin tức', points: fNews, maxPoints: 10, passed: !newsFilter.blocked, detail: newsFilter.blocked ? newsFilter.reason : 'Không có tin HIGH trong cửa sổ tin' },
+    { id: 'bien_dong', label: 'Biến động hợp lý', points: fVol, maxPoints: 8, passed: healthyVol, detail: `Độ lệch chuẩn ${atrP.toFixed(3)}% ${healthyVol ? 'trong vùng an toàn' : 'bất thường'}` },
+    { id: 'phien', label: 'Phiên giao dịch', points: sess.points, maxPoints: 5, passed: sess.points >= 3, detail: sess.detail },
+    { id: 'rsi', label: 'RSI không cực đoan', points: fRsi, maxPoints: 8, passed: rsiOk, detail: `RSI14 = ${rsiV.toFixed(1)}` },
+    { id: 'spread', label: 'Spread trong ngưỡng', points: fSpread, maxPoints: 5, passed: spreadOk, detail: `Spread ${asset.spread} pips` },
+    { id: 'tin_tuc', label: 'Lọc tin tức', points: fNews, maxPoints: 5, passed: !newsFilter.blocked, detail: newsFilter.blocked ? newsFilter.reason : 'Không có tin HIGH trong cửa sổ tin' },
   ];
 
   const snapshot: MarketSnapshot = {
@@ -206,7 +207,9 @@ export function evaluateSignal(
     return { signal: null, snapshot, rawFeatures };
   }
 
-  const baseScore = totalScore(factors as any);
+  // P1-kaizen 16/10/2026: tong maxPoints moi = 71 (20+20+8+5+8+5+5) -> chuan hoa ve thang 0-100
+  // de nguong verdict (80/65/50) van giu nguyen y nghia.
+  const baseScore = Math.round((totalScore(factors as any) / maxScore(factors as any)) * 100);
 
   // --- LỚP XÁC NHẬN VĨ MÔ (Blueprint §9): cộng/trừ điểm theo độ đồng thuận ---
   // macroScore: -100..+100 (dương = ủng hộ BUY, âm = ủng hộ SELL)

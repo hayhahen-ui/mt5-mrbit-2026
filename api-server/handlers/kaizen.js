@@ -13,6 +13,9 @@
 import { configured, cors, env, q, ins } from '../../api/_supa.js';
 
 const TABLE_MISSING = /kaizen_findings|knowledge_entries|relation .* does not exist/i;
+// P1-kaizen 16/10/2026: phan biet thieu COT (vd migration 004 chua chay -> cot effect
+// khong ton tai) voi thieu BANG, de bao loi trung thuc thay vi do thua cho 003.
+const COLUMN_MISSING = /column "([^"]+)" of relation "([^"]+)" does not exist/i;
 
 const SEV = ['cao', 'trung-binh', 'thap'];
 const KIND = ['luat-cung', 'de-xuat'];
@@ -140,6 +143,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'GET/POST/PATCH/DELETE only' });
   } catch (e) {
     const msg = String((e && e.message) || e);
+    const colMiss = COLUMN_MISSING.exec(msg);
+    if (colMiss) {
+      return res.status(503).json({ ok: false, error: `Thiếu cột "${colMiss[1]}" trong bảng "${colMiss[2]}" — kiểm tra migration Supabase (vd 004_knowledge_effect.sql).` });
+    }
     if (TABLE_MISSING.test(msg)) {
       return res.status(503).json({ ok: false, error: 'Chưa chạy migration 003_kaizen.sql trên Supabase (SQL Editor).' });
     }
