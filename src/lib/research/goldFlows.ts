@@ -74,7 +74,7 @@ export async function fetchGoldFlows(): Promise<GoldFlowData | null> {
     const r = await fetch(apiUrl(`/api/gold-flows?t=${Date.now()}`), { cache: 'no-store' });
     const d = await readApiJson(r, 'Dòng vốn vàng');
     if (d.error) return null;
-    const data: GoldFlowData = { wgc: d.wgc || null, gld: d.gld || null };
+    const data: GoldFlowData = { wgc: d.wgc || null, gld: d.gld || null, imf_cofer: d.imf_cofer || null };
     try { localStorage.setItem(LS_KEY, JSON.stringify({ data, cachedAt: Date.now() })); } catch { /* noop */ }
     return data;
   } catch {
@@ -87,7 +87,7 @@ export async function fetchGldDaily(tdKey: string): Promise<GoldFlowData['gld']>
   const r = await fetch(apiUrl('/api/twelvedata'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: tdKey, endpoint: 'time_series', params: { symbol: 'GLD', interval: '1day', outputsize: '25' } }),
+    body: JSON.stringify({ apikey: tdKey, endpoint: 'time_series', params: { symbol: 'GLD', interval: '1day', outputsize: '25' } }),
   });
   const d = await readApiJson(r, 'TwelveData GLD');
   if (d.error || d.status === 'error' || !Array.isArray(d.values) || d.values.length < 5) return null;

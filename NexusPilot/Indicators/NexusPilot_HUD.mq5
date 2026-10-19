@@ -183,7 +183,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       }
       if(sparam == NP_PREFIX + "TAB_BTN_EXPORT_HTML")
       {
-         if(CHtmlReportExporter::ExportReport()) Alert("NexusPilot HUD: Đã xuất báo cáo HTML tại MQL5/Files/NexusPilot_Report.html");
+         if(CHtmlReportExporter::ExportReport(g_engMgr)) Alert("NexusPilot HUD: Đã xuất báo cáo HTML tại MQL5/Files/NexusPilot_Report.html");
          return;
       }
       for(int r = 0; r < 8; r++)
@@ -193,6 +193,26 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             g_radar.SwitchChartToSymbol(r);
             return;
          }
+      }
+      // FIX 19/10/2026 (audit): HUD thiếu handler 3 nút bật/tắt Engine trên Tab SIG
+      // (bản EA NexusPilot.mq5 đã có đầy đủ) — bấm nút trước đây không có tác dụng.
+      if(sparam == NP_PREFIX + "TAB_BTN_TOGGLE_SMC")
+      {
+         g_engMgr.SetEngineStatus(ENGINE_SMC, !g_engMgr.IsEngineEnabled(ENGINE_SMC));
+         RedrawAll();
+         return;
+      }
+      if(sparam == NP_PREFIX + "TAB_BTN_TOGGLE_TREND")
+      {
+         g_engMgr.SetEngineStatus(ENGINE_TREND, !g_engMgr.IsEngineEnabled(ENGINE_TREND));
+         RedrawAll();
+         return;
+      }
+      if(sparam == NP_PREFIX + "TAB_BTN_TOGGLE_MREV")
+      {
+         g_engMgr.SetEngineStatus(ENGINE_MEAN_REV, !g_engMgr.IsEngineEnabled(ENGINE_MEAN_REV));
+         RedrawAll();
+         return;
       }
    }
    if(id == CHARTEVENT_KEYDOWN)
@@ -209,7 +229,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          case 'H': case 'h': g_hud.SetActiveTab(TAB_HELP);   RedrawAll(); break;
          case 'K': case 'k': g_dock.Toggle();                RedrawAll(); break;
          case 'M': case 'm': g_hud.ToggleMinimize();         RedrawAll(); break;
-         case 'R': case 'r': CHtmlReportExporter::ExportReport(); break;
+         case 'R': case 'r': CHtmlReportExporter::ExportReport(g_engMgr); break;
       }
    }
 }

@@ -261,7 +261,8 @@ public:
          color chgClr = (card.change24hPct >= 0) ? CTheme::BuyGreen() : CTheme::SellRed();
          CGuiRenderer::CreateLabel(m_chartId, "TAB_CONTENT_RCC_" + IntegerToString(i), chgText, m_x + 240, cardY + 8, chgClr, 9, CTheme::FontBold());
 
-         string sigText = (card.signalDir == DIR_BUY) ? "🟢 BUY (Q5)" : ((card.signalDir == DIR_SELL) ? "🔴 SELL (Q5)" : "— QUÉT...");
+         string qTag = "(Q" + IntegerToString((int)card.quality) + ")";
+         string sigText = (card.signalDir == DIR_BUY) ? ("🟢 BUY " + qTag) : ((card.signalDir == DIR_SELL) ? ("🔴 SELL " + qTag) : "— QUÉT...");
          color sigClr = (card.signalDir == DIR_BUY) ? CTheme::BuyGreen() : ((card.signalDir == DIR_SELL) ? CTheme::SellRed() : CTheme::TextMuted());
          CGuiRenderer::CreateLabel(m_chartId, "TAB_CONTENT_RCI_" + IntegerToString(i), sigText, m_x + 330, cardY + 8, sigClr, 8);
 

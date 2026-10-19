@@ -268,7 +268,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       // Xuất báo cáo HTML
       if(sparam == NP_PREFIX + "TAB_BTN_EXPORT_HTML")
       {
-         if(CHtmlReportExporter::ExportReport())
+         if(CHtmlReportExporter::ExportReport(g_engMgr))
          {
             Alert("NexusPilot: Đã xuất báo cáo thành công! Mở file tại: MQL5/Files/NexusPilot_Report.html");
          }
@@ -321,7 +321,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          case 'H': case 'h': g_hud.SetActiveTab(TAB_HELP);   RedrawAll(); break;
          case 'K': case 'k': g_dock.Toggle();                RedrawAll(); break;
          case 'M': case 'm': g_hud.ToggleMinimize();         RedrawAll(); break;
-         case 'R': case 'r': CHtmlReportExporter::ExportReport(); break;
+         case 'R': case 'r': CHtmlReportExporter::ExportReport(g_engMgr); break;
          case 27:            // Phím Esc
             if(g_hud.GetActiveTab() != TAB_FLIGHT)
             {

@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     };
     if (!(row.equity > 0)) return res.status(400).json({ ok: false, error: 'equity phải > 0.' });
-    const { q, ins } = await import('./_supa.js');
+    const { q, ins } = await import('../../api/_supa.js');
     const cur = await q('/account_state', { id: 'eq.1', select: 'id', limit: 1 });
     if (cur && cur[0]) await upd('/account_state', row, { id: 'eq.1' });
     else await ins('/account_state', [{ id: 1, ...row }]);

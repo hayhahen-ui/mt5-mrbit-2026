@@ -87,17 +87,78 @@ public:
       m_state.candleRemainingSec = (remaining > 0) ? remaining : 0;
    }
 
-   // Đo lường sức mạnh tiền tệ (Currency Strength Meter)
+   // Hậu tố symbol của broker (vd: "" | ".pro" | "m") — suy từ _Symbol hiện tại
+   // (giả định tên gốc dài 6 ký tự như EURUSD, XAUUSD).
+   string BrokerSuffix()
+   {
+      if(StringLen(_Symbol) <= 6) return "";
+      return StringSubstr(_Symbol, 6);
+   }
+
+   // % thay đổi giá đóng cửa D1 (nến 1 so với nến 2); EMPTY_VALUE nếu không lấy được.
+   double DailyChangePct(string sym)
+   {
+      double c1 = iClose(sym, PERIOD_D1, 1);
+      double c2 = iClose(sym, PERIOD_D1, 2);
+      if(c1 <= 0.0 || c2 <= 0.0) return EMPTY_VALUE;
+      return (c1 - c2) / c2 * 100.0;
+   }
+
+   // Thứ hạng quy ước đặt cặp tiền (base đứng trước): EUR>GBP>AUD>NZD>USD>CAD>CHF>JPY
+   int CurrencyRank(string cur)
+   {
+      if(cur == "EUR") return 0;
+      if(cur == "GBP") return 1;
+      if(cur == "AUD") return 2;
+      if(cur == "NZD") return 3;
+      if(cur == "USD") return 4;
+      if(cur == "CAD") return 5;
+      if(cur == "CHF") return 6;
+      return 7; // JPY
+   }
+
+   // Đo lường sức mạnh tiền tệ (Currency Strength Meter) từ GIÁ THẬT.
+   // FIX 19/10/2026 (audit): bỏ công thức giả lập cũ (sin theo giờ) — thay bằng
+   // trung bình % thay đổi D1 của 7 cặp chéo liên quan (dấu + khi là base, - khi là quote),
+   // chuẩn hóa về thang 0-100. Tính tối đa 1 lần/phút để nhẹ CPU.
    void UpdateCurrencyStrength()
    {
+      static datetime lastCalc = 0;
+      datetime now = TimeCurrent();
+      if(now - lastCalc < 60) return;
+      lastCalc = now;
+
       string majors[8] = {"USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"};
+      string suffix = BrokerSuffix();
       for(int i = 0; i < 8; i++)
       {
          m_state.csm[i].currency = majors[i];
-         // Giả lập tính toán tương đối dựa trên động lượng các cặp liên quan
-         m_state.csm[i].score = 45.0 + ((i * 13) % 40) + (MathSin(TimeCurrent() / 3600.0 + i) * 10.0);
-         if(m_state.csm[i].score > 95.0) m_state.csm[i].score = 95.0;
-         if(m_state.csm[i].score < 10.0) m_state.csm[i].score = 10.0;
+         double sum = 0.0;
+         int cnt = 0;
+         for(int j = 0; j < 8; j++)
+         {
+            if(j == i) continue;
+            string a = majors[i], b = majors[j];
+            bool iIsBase = (CurrencyRank(a) < CurrencyRank(b));
+            string base  = (iIsBase ? a : b);
+            string quote = (iIsBase ? b : a);
+            string pair = base + quote + suffix;
+            MqlTick tk;
+            if(!SymbolInfoTick(pair, tk))
+            {
+               pair = base + quote; // thử lại không hậu tố
+               if(!SymbolInfoTick(pair, tk)) continue;
+            }
+            double chg = DailyChangePct(pair);
+            if(chg == EMPTY_VALUE) continue;
+            sum += (iIsBase ? chg : -chg);
+            cnt++;
+         }
+         double score = 50.0;
+         if(cnt > 0) score = 50.0 + (sum / cnt) * 10.0; // mỗi 0.1% ~ 1 điểm
+         if(score > 95.0) score = 95.0;
+         if(score < 5.0) score = 5.0;
+         m_state.csm[i].score = score;
       }
    }
 
@@ -113,7 +174,13 @@ public:
       long spreadVal = SymbolInfoInteger(m_symbol, SYMBOL_SPREAD);
       double point = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
       m_state.currentSpread = spreadVal * (point / (point * 10.0)); // Qui về pips
-      m_state.averageSpread = m_state.currentSpread * 1.05;
+      // FIX 19/10/2026 (audit): averageSpread phải là trung bình trượt thật (EMA chậm),
+      // không được gán = currentSpread * 1.05 — nếu không điều kiện lọc giãn spread
+      // (currentSpread > averageSpread * 2.5 trong EngineManager) không bao giờ kích hoạt.
+      if(m_state.averageSpread <= 0.0)
+         m_state.averageSpread = m_state.currentSpread;
+      else
+         m_state.averageSpread = m_state.averageSpread * 0.98 + m_state.currentSpread * 0.02;
 
       // ATR 14
       int hAtr = iATR(m_symbol, PERIOD_CURRENT, 14);

@@ -124,21 +124,31 @@ public:
             }
          }
 
-         // Trạng thái Signal giả lập trên radar
-         if(i == 0) // Cặp đầu tiên (vd XAUUSD)
+         // FIX 19/10/2026 (audit): BỎ block giả lập cũ (card đầu tiên luôn BUY/Q5/pWin 74.2).
+         // Trạng thái suy từ trendBias THẬT (EMA20/50 H1) tính ở trên; pWin = 0
+         // (không hiển thị xác suất bịa — theo nguyên tắc P0-kaizen của web app).
+         if(m_cards[i].trendBias > 0)
          {
             m_cards[i].signalDir    = DIR_BUY;
-            m_cards[i].signalEngine = "SMC_ICT";
-            m_cards[i].quality      = QUALITY_Q5;
-            m_cards[i].pWin         = 74.2;
-            m_cards[i].hasAlert     = true;
+            m_cards[i].signalEngine = "EMA_H1";
+            m_cards[i].quality      = QUALITY_Q3;
+            m_cards[i].pWin         = 0.0;
+            m_cards[i].hasAlert     = false;
+         }
+         else if(m_cards[i].trendBias < 0)
+         {
+            m_cards[i].signalDir    = DIR_SELL;
+            m_cards[i].signalEngine = "EMA_H1";
+            m_cards[i].quality      = QUALITY_Q3;
+            m_cards[i].pWin         = 0.0;
+            m_cards[i].hasAlert     = false;
          }
          else
          {
             m_cards[i].signalDir    = DIR_FLAT;
             m_cards[i].signalEngine = "Scanning";
             m_cards[i].quality      = QUALITY_Q3;
-            m_cards[i].pWin         = 50.0;
+            m_cards[i].pWin         = 0.0;
             m_cards[i].hasAlert     = false;
          }
       }
