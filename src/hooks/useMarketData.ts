@@ -17,6 +17,7 @@ import { observeCandidate } from '../lib/neural/observer';
 import { recordPrices, seedCloses, HEATMAP_SYMBOLS } from '../lib/priceHistory';
 import { maybeForexSnapshot } from '../lib/forexJournal';
 import { totalScore } from '../lib/scoring';
+import { maybeRelaySignal } from '../lib/signalRelay';
 import { fetchFredSnapshotOnline, snapshotToSeries } from '../lib/research/fredStore';
 import { fetchAllFred } from '../lib/research/fred';
 import { computeMacroOnly } from '../lib/research/directionScore';
@@ -250,7 +251,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
           snapshots[a.symbol] = snapshot;
           if (signal) {
             signals[a.symbol] = signal;
-
+            maybeRelaySignal(signal);
             // Neural shadow: quan sát ứng viên, không can thiệp quyết định (skill §5)
             if (signal.direction !== 'FLAT') {
               try {
