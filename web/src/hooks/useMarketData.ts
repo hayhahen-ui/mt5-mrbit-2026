@@ -17,7 +17,6 @@ import { observeCandidate } from '../lib/neural/observer';
 import { recordPrices, seedCloses, HEATMAP_SYMBOLS } from '../lib/priceHistory';
 import { maybeForexSnapshot } from '../lib/forexJournal';
 import { totalScore } from '../lib/scoring';
-import { maybeRelaySignal } from '../lib/signalRelay';
 import { fetchFredSnapshotOnline, snapshotToSeries } from '../lib/research/fredStore';
 import { fetchAllFred } from '../lib/research/fred';
 import { computeMacroOnly } from '../lib/research/directionScore';
@@ -251,7 +250,7 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
           snapshots[a.symbol] = snapshot;
           if (signal) {
             signals[a.symbol] = signal;
-            maybeRelaySignal(signal);
+
             // Neural shadow: quan sát ứng viên, không can thiệp quyết định (skill §5)
             if (signal.direction !== 'FLAT') {
               try {
@@ -351,6 +350,22 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
         if (q) applyQuotes({ XAUUSD: q }, []);
       } catch { /* lỗi mạng thì bỏ qua, 20s sau thử lại */ }
     }, 20000);
+    // Tự tỉnh lại khi tab hiện lại: trình duyệt treo/throttle timer của tab nền
+    // (thậm chí discard tab) nên giá đứng yên cho tới khi user click lung tung.
+    // Nghe visibilitychange + focus: vừa quay lại tab là kéo giá mới ngay,
+    // không chờ tới kỳ poll kế tiếp, không cần click vào trong trang.
+    const refreshNow = () => {
+      if (document.visibilityState === 'hidden') return;
+      void tickFast();
+      void (async () => {
+        try {
+          const q = await fetchGoldQuote();
+          if (q) applyQuotes({ XAUUSD: q }, []);
+        } catch { /* lần poll 20s kế tiếp thử lại */ }
+      })();
+    };
+    document.addEventListener('visibilitychange', refreshNow);
+    window.addEventListener('focus', refreshNow);
     // Forex trong fetchAllQuotes đã gộp; tách nhịp riêng để đỡ tải:
     forexTimer = window.setInterval(async () => {
       const quotes = tdOverride(await fetchAllQuotes());
@@ -387,6 +402,8 @@ export function useMarketData(equity: number, riskPct: number): MarketDataState 
       window.clearInterval(tdId);
       window.clearInterval(ghId);
       window.removeEventListener('td-refresh-now', tdManual);
+      document.removeEventListener('visibilitychange', refreshNow);
+      window.removeEventListener('focus', refreshNow);
     };
   }, [applyQuotes]);
 
