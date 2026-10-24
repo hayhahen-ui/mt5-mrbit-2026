@@ -50,4 +50,7 @@ mount('/api/kaizen', kaizen);
 app.get('/healthz', (_req, res) => res.json({ ok: true, service: 'mt5-mrbit-2026-api' }));
 
 const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => console.log(`mt5-mrbit-2026-api listening on :${port}`));
+// Render quét port bằng IPv4: listen() không chỉ host để Node 24 bind :: (IPv6)
+// → máy quét không thấy port dù log đã "listening" → deploy fail "Port scan
+// timeout" (24/10/2026, deploy 11:28). Bind rõ 0.0.0.0 để quét thấy ngay.
+app.listen(port, '0.0.0.0', () => console.log(`mt5-mrbit-2026-api listening on 0.0.0.0:${port}`));
