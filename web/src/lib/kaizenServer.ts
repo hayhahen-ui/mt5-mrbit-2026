@@ -4,12 +4,15 @@
  */
 import type { KaizenFinding } from './kaizenEngine';
 import type { KnowledgeEntry } from './knowledge';
+import { POSITIONS_API_URL } from './apiHealth';
 
 const API = (): string => {
   try {
-    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || '';
+    // Chưa cấu hình VITE_POSITIONS_API_URL → về thẳng API production Render
+    // (26/10/2026: thiếu biến làm kaizenServerOn() sai là false, panel rớt local).
+    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || POSITIONS_API_URL;
     return u ? u.replace(/\/$/, '') : '';
-  } catch { return ''; }
+  } catch { return POSITIONS_API_URL; }
 };
 
 export const kaizenServerOn = (): boolean => !!API();

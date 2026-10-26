@@ -7,6 +7,7 @@
  * sẽ bị từ chối kèm thông báo, giữ nguyên 100% dữ liệu cũ.
  */
 import { pipSizeOf } from './account';
+import { POSITIONS_API_URL } from './apiHealth';
 
 const STORAGE_KEY = 'nexuspilot-benchmark-v1';
 export const MAX_TRADES_PER_STRATEGY = 5000;
@@ -254,10 +255,12 @@ export function filterTradesByCutoff(trades: BenchmarkTrade[], cutoffMs: number)
 
 const serverBase = (): string => {
   try {
-    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || '';
+    // Chưa cấu hình VITE_POSITIONS_API_URL → về thẳng API production Render
+    // (26/10/2026: thiếu biến làm benchmarkServerOn() sai là false, app rớt local).
+    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || POSITIONS_API_URL;
     return String(u).replace(/\/$/, '');
   } catch {
-    return '';
+    return POSITIONS_API_URL;
   }
 };
 

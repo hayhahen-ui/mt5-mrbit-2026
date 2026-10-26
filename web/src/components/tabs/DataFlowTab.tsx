@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Activity, RefreshCw, Zap, Database, Cpu, Radio } from 'lucide-react';
-import { apiUrl } from '../../lib/apiHealth';
+import { apiUrl, POSITIONS_API_URL } from '../../lib/apiHealth';
 
 interface SourceDef {
   id: string;
@@ -70,9 +70,11 @@ const LAYER_META = {
 
 const POS_API = (): string => {
   try {
-    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || '';
+    // Chưa cấu hình VITE_POSITIONS_API_URL → về thẳng API production Render
+    // (26/10/2026: thiếu biến này làm 4 mục kaizen báo đỏ dù API vẫn sống).
+    const u = (import.meta as any).env?.VITE_POSITIONS_API_URL || POSITIONS_API_URL;
     return u ? u.replace(/\/$/, '') : '';
-  } catch { return ''; }
+  } catch { return POSITIONS_API_URL; }
 };
 
 interface KzStatus { ok: boolean | null; detail: string; blocks?: number; }

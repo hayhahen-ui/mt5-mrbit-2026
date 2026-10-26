@@ -5,15 +5,17 @@
  * - Nếu server chưa cấu hình Supabase (503) → im lặng, app chạy local-only như cũ.
  * - Id đã đẩy được lưu localStorage để không đẩy trùng sau F5.
  */
-import { API_BASE } from './apiHealth';
+import { POSITIONS_API_URL } from './apiHealth';
 import type { Position } from '../types';
 
 /**
  * Base URL cho API positions nấc 2.
  * - Production: VITE_POSITIONS_API_URL → Render Web Service (mt5-mrbit-2026-api)
- * - Fallback: API_BASE (Vercel) khi chưa cấu hình — giữ tương thích.
+ * - Fallback: POSITIONS_API_URL (Render) khi chưa cấu hình — 26/10/2026: fallback
+ *   cũ về API_BASE (Vercel) là sai vì Vercel không phục vụ /api/positions (404),
+ *   khiến dual-write vị thế lặng lẽ rớt hết trong production.
  */
-const POS_BASE = (import.meta as any).env?.VITE_POSITIONS_API_URL || API_BASE;
+const POS_BASE = (import.meta as any).env?.VITE_POSITIONS_API_URL || POSITIONS_API_URL;
 const posUrl = (path: string) => `${POS_BASE}${path}`;
 
 const PUSHED_KEY = 'nexuspilot-synced-positions-v1';

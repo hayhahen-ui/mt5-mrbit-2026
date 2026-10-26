@@ -14,6 +14,15 @@ export const apiUrl = (path: string) => `${API_BASE}${path}`;
 
 export const PROD_URL = 'https://mt5-mrbit-2026-web.vercel.app';
 
+/**
+ * Production API positions/benchmark/kaizen (Render Web Service mt5-mrbit-2026-api).
+ * Fallback khi chưa cấu hình VITE_POSITIONS_API_URL — 26/10/2026: site Render
+ * không đặt biến này nên tab DÒNG CHẢY báo đỏ 4 mục kaizen dù API vẫn sống;
+ * Vercel không phục vụ các endpoint này (/api/positions → 404) nên fallback
+ * về API_BASE là sai, phải về thẳng Render.
+ */
+export const POSITIONS_API_URL = 'https://mt5-mrbit-2026-api.onrender.com';
+
 /** Vercel 404 page bắt đầu bằng "The page could not be found" */
 function isVercel404Page(text: string): boolean {
   return text.includes('The page could not be found') || /NOT_FOUND/.test(text.slice(0, 300));
