@@ -1,37 +1,37 @@
 {
- "asOf": "2026-10-26",
- "fetchedAt": "2026-10-26T14:53:07.107Z",
+ "asOf": "2026-10-27",
+ "fetchedAt": "2026-10-27T00:13:56.117Z",
  "source": "app-push",
  "series": {
   "DGS2": {
-   "date": "2026-10-22",
-   "value": 4.65,
-   "prevDate": "2026-10-21",
-   "prevValue": 4.81
+   "date": "2026-10-23",
+   "value": 4.69,
+   "prevDate": "2026-10-22",
+   "prevValue": 4.65
   },
   "DGS10": {
-   "date": "2026-10-22",
-   "value": 4.96,
-   "prevDate": "2026-10-21",
-   "prevValue": 5.13
+   "date": "2026-10-23",
+   "value": 5,
+   "prevDate": "2026-10-22",
+   "prevValue": 4.96
   },
   "DFII10": {
-   "date": "2026-10-22",
-   "value": 2.64,
-   "prevDate": "2026-10-21",
-   "prevValue": 2.76
+   "date": "2026-10-23",
+   "value": 2.66,
+   "prevDate": "2026-10-22",
+   "prevValue": 2.64
   },
   "DTWEXBGS": {
-   "date": "2026-10-16",
-   "value": 121.4048,
-   "prevDate": "2026-10-15",
-   "prevValue": 121.5693
+   "date": "2026-10-23",
+   "value": 121.3202,
+   "prevDate": "2026-10-22",
+   "prevValue": 121.3531
   },
   "T10YIE": {
-   "date": "2026-10-23",
+   "date": "2026-10-26",
    "value": 2.34,
-   "prevDate": "2026-10-22",
-   "prevValue": 2.32
+   "prevDate": "2026-10-23",
+   "prevValue": 2.34
   }
  }
 }
